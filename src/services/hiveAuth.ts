@@ -42,37 +42,60 @@ export const loginWithKeychain = (callback: (user: HiveUser | null, error?: stri
       // Try again after a delay to ensure extension is loaded
       if (isHiveKeychainAvailable()) {
         console.log("Keychain detected after delay");
-        performKeychainLogin(callback);
+        requestKeychainUsername(callback);
       } else {
         console.log("Keychain still not detected after delay");
-        callback(null, "Hive Keychain is not installed or not detected");
+        callback(null, "Hive Keychain ist nicht installiert oder nicht erkannt");
       }
     }, 1000);
     return;
   }
   
-  performKeychainLogin(callback);
+  requestKeychainUsername(callback);
 };
 
-const performKeychainLogin = (callback: (user: HiveUser | null, error?: string) => void): void => {
+// First request username from Keychain before signing
+const requestKeychainUsername = (callback: (user: HiveUser | null, error?: string) => void): void => {
+  console.log("Requesting Keychain username");
+  
+  // First, get the username from Keychain
+  window.hive_keychain.requestHandshake(() => {
+    const accounts = window.hive_keychain.getAccounts();
+    console.log("Keychain accounts:", accounts);
+    
+    if (!accounts || accounts.length === 0) {
+      callback(null, "Keine Hive Accounts in Keychain gefunden");
+      return;
+    }
+    
+    // Use the first account in Keychain
+    const username = accounts[0];
+    console.log("Using account:", username);
+    
+    // Now perform login with the username
+    performKeychainLogin(username, callback);
+  });
+};
+
+const performKeychainLogin = (username: string, callback: (user: HiveUser | null, error?: string) => void): void => {
   const now = Date.now();
   const message = `Login to Hive Welcome App: ${now}`;
   
-  console.log("Requesting keychain sign buffer");
+  console.log(`Requesting keychain sign buffer for user ${username}`);
   
   window.hive_keychain.requestSignBuffer(
-    "", // We don't know the username yet, so leave it empty
+    username, // Now we provide the username
     message,
     "Posting", // Use the posting key for authentication
     (response: any) => {
       console.log("Keychain response:", response);
       if (response.success) {
         callback({
-          username: response.data.username,
+          username: response.data.username || username,
           loggedIn: true
         });
       } else {
-        callback(null, response.message || "Authentication failed");
+        callback(null, response.message || "Authentifizierung fehlgeschlagen");
       }
     }
   );
@@ -91,7 +114,7 @@ export const loginWithHiveAuth = (callback: (user: HiveUser | null, error?: stri
         performHiveAuthLogin(callback);
       } else {
         console.log("HiveAuth still not detected after delay");
-        callback(null, "HiveAuth is not available or not detected");
+        callback(null, "HiveAuth ist nicht verfügbar oder nicht erkannt");
       }
     }, 1000);
     return;
@@ -117,7 +140,7 @@ const performHiveAuthLogin = (callback: (user: HiveUser | null, error?: string) 
         loggedIn: true
       });
     } else {
-      callback(null, "Authentication failed");
+      callback(null, "Authentifizierung fehlgeschlagen");
     }
   });
 };
@@ -125,7 +148,11 @@ const performHiveAuthLogin = (callback: (user: HiveUser | null, error?: string) 
 // Add type definitions for the global window object
 declare global {
   interface Window {
-    hive_keychain: any;
+    hive_keychain: {
+      requestSignBuffer: (username: string, message: string, method: string, callback: (response: any) => void) => void;
+      requestHandshake: (callback: () => void) => void;
+      getAccounts: () => string[];
+    };
     hiveAuth: any;
   }
 }

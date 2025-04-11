@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginWithKeychain, loginWithHiveAuth, isHiveKeychainAvailable, isHiveAuthAvailable, HiveUser } from "@/services/hiveAuth";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface HiveLoginProps {
@@ -125,7 +125,10 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
                 Anmeldung läuft...
               </span>
             ) : (
-              "Mit Hive Keychain anmelden"
+              <span className="flex items-center">
+                <KeyRound className="mr-2 h-4 w-4" />
+                Mit Hive Keychain anmelden
+              </span>
             )}
           </Button>
         </div>
@@ -163,7 +166,10 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
                 Anmeldung läuft...
               </span>
             ) : (
-              "Mit HiveAuth anmelden"
+              <span className="flex items-center">
+                <Fingerprint className="mr-2 h-4 w-4" />
+                Mit HiveAuth anmelden
+              </span>
             )}
           </Button>
         </div>
