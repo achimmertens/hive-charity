@@ -139,6 +139,7 @@ declare global {
       requestSignBuffer: (username: string, message: string, method: string, callback: (response: any) => void) => void;
       requestHandshake: (callback: () => void) => void;
       getAccounts: () => string[];
+      requestVote: (username: string, permlink: string, author: string, weight: number, callback: (response: any) => void) => void;
     };
     hiveAuth: any;
   }
