@@ -33,16 +33,21 @@ export const isHiveAuthAvailable = (): boolean => {
 };
 
 // Login with Hive Keychain
-export const loginWithKeychain = (callback: (user: HiveUser | null, error?: string) => void): void => {
-  console.log("Attempting to login with Hive Keychain");
+export const loginWithKeychain = (username: string, callback: (user: HiveUser | null, error?: string) => void): void => {
+  console.log("Attempting to login with Hive Keychain for user:", username);
   console.log("Keychain available:", isHiveKeychainAvailable());
+  
+  if (!username || username.trim() === '') {
+    callback(null, "Bitte geben Sie einen Benutzernamen ein");
+    return;
+  }
   
   if (!isHiveKeychainAvailable()) {
     setTimeout(() => {
       // Try again after a delay to ensure extension is loaded
       if (isHiveKeychainAvailable()) {
         console.log("Keychain detected after delay");
-        requestKeychainUsername(callback);
+        performKeychainLogin(username, callback);
       } else {
         console.log("Keychain still not detected after delay");
         callback(null, "Hive Keychain ist nicht installiert oder nicht erkannt");
@@ -51,30 +56,7 @@ export const loginWithKeychain = (callback: (user: HiveUser | null, error?: stri
     return;
   }
   
-  requestKeychainUsername(callback);
-};
-
-// First request username from Keychain before signing
-const requestKeychainUsername = (callback: (user: HiveUser | null, error?: string) => void): void => {
-  console.log("Requesting Keychain username");
-  
-  // First, get the username from Keychain
-  window.hive_keychain.requestHandshake(() => {
-    const accounts = window.hive_keychain.getAccounts();
-    console.log("Keychain accounts:", accounts);
-    
-    if (!accounts || accounts.length === 0) {
-      callback(null, "Keine Hive Accounts in Keychain gefunden");
-      return;
-    }
-    
-    // Use the first account in Keychain
-    const username = accounts[0];
-    console.log("Using account:", username);
-    
-    // Now perform login with the username
-    performKeychainLogin(username, callback);
-  });
+  performKeychainLogin(username, callback);
 };
 
 const performKeychainLogin = (username: string, callback: (user: HiveUser | null, error?: string) => void): void => {
@@ -84,7 +66,7 @@ const performKeychainLogin = (username: string, callback: (user: HiveUser | null
   console.log(`Requesting keychain sign buffer for user ${username}`);
   
   window.hive_keychain.requestSignBuffer(
-    username, // Now we provide the username
+    username,
     message,
     "Posting", // Use the posting key for authentication
     (response: any) => {
@@ -102,16 +84,21 @@ const performKeychainLogin = (username: string, callback: (user: HiveUser | null
 };
 
 // Login with HiveAuth
-export const loginWithHiveAuth = (callback: (user: HiveUser | null, error?: string) => void): void => {
-  console.log("Attempting to login with HiveAuth");
+export const loginWithHiveAuth = (username: string, callback: (user: HiveUser | null, error?: string) => void): void => {
+  console.log("Attempting to login with HiveAuth for user:", username);
   console.log("HiveAuth available:", isHiveAuthAvailable());
+  
+  if (!username || username.trim() === '') {
+    callback(null, "Bitte geben Sie einen Benutzernamen ein");
+    return;
+  }
   
   if (!isHiveAuthAvailable()) {
     setTimeout(() => {
       // Try again after a delay to ensure extension is loaded
       if (isHiveAuthAvailable()) {
         console.log("HiveAuth detected after delay");
-        performHiveAuthLogin(callback);
+        performHiveAuthLogin(username, callback);
       } else {
         console.log("HiveAuth still not detected after delay");
         callback(null, "HiveAuth ist nicht verfügbar oder nicht erkannt");
@@ -120,11 +107,11 @@ export const loginWithHiveAuth = (callback: (user: HiveUser | null, error?: stri
     return;
   }
   
-  performHiveAuthLogin(callback);
+  performHiveAuthLogin(username, callback);
 };
 
-const performHiveAuthLogin = (callback: (user: HiveUser | null, error?: string) => void): void => {
-  console.log("Performing HiveAuth login");
+const performHiveAuthLogin = (username: string, callback: (user: HiveUser | null, error?: string) => void): void => {
+  console.log("Performing HiveAuth login for user:", username);
   
   // This is a simplified version, actual implementation would require proper HiveAuth integration
   window.hiveAuth.login((error: any, username: string) => {

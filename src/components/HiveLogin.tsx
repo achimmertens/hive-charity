@@ -4,12 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginWithKeychain, loginWithHiveAuth, isHiveKeychainAvailable, isHiveAuthAvailable, HiveUser } from "@/services/hiveAuth";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint, User } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface HiveLoginProps {
   onLogin: (user: HiveUser) => void;
 }
+
+const formSchema = z.object({
+  username: z.string().min(3, "Benutzername muss mindestens 3 Zeichen haben").max(16, "Benutzername darf maximal 16 Zeichen haben")
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +28,13 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
   const [hiveAuthAvailable, setHiveAuthAvailable] = useState<boolean | null>(null);
   const [loginMethod, setLoginMethod] = useState<'keychain' | 'hiveauth' | null>(null);
   const { toast } = useToast();
+  
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: "",
+    },
+  });
   
   // Check availability after component mounts
   useEffect(() => {
@@ -40,10 +58,10 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
     });
   };
   
-  const handleKeychainLogin = () => {
+  const handleKeychainLogin = (values: FormValues) => {
     setIsLoading(true);
     setLoginMethod('keychain');
-    loginWithKeychain((user, error) => {
+    loginWithKeychain(values.username, (user, error) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
@@ -62,10 +80,10 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
     });
   };
   
-  const handleHiveAuthLogin = () => {
+  const handleHiveAuthLogin = (values: FormValues) => {
     setIsLoading(true);
     setLoginMethod('hiveauth');
-    loginWithHiveAuth((user, error) => {
+    loginWithHiveAuth(values.username, (user, error) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
@@ -93,6 +111,36 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Form {...form}>
+          <form className="space-y-4">
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hive Benutzername</FormLabel>
+                  <FormControl>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground">
+                        @
+                      </span>
+                      <Input 
+                        placeholder="Benutzername eingeben" 
+                        className="rounded-l-none" 
+                        {...field} 
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Geben Sie Ihren Hive Benutzernamen ohne @ ein
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+        
         {keychainAvailable === false && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -115,7 +163,9 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
         
         <div className="flex flex-col space-y-2">
           <Button
-            onClick={handleKeychainLogin}
+            onClick={() => {
+              form.handleSubmit(handleKeychainLogin)();
+            }}
             disabled={isLoading || keychainAvailable === false}
             className="bg-hive hover:bg-hive-dark text-white"
           >
@@ -155,7 +205,9 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
         
         <div className="flex flex-col space-y-2">
           <Button
-            onClick={handleHiveAuthLogin}
+            onClick={() => {
+              form.handleSubmit(handleHiveAuthLogin)();
+            }}
             disabled={isLoading || hiveAuthAvailable === false}
             variant="outline"
             className="border-hive text-hive hover:bg-hive hover:text-white"
