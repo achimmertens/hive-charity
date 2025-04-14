@@ -30,9 +30,9 @@ const Index = () => {
         console.log(`New account created for user: ${username}`);
       }
       
-      // Record login in the LoginLog table
+      // Record login in the LoginLog table - Fixed to use lowercase 'loginlog'
       await supabase
-        .from('LoginLog')
+        .from('loginlog')
         .insert({ loginname: username });
       
       console.log(`Login recorded for user: ${username}`);
