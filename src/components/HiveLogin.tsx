@@ -279,6 +279,8 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       </CardContent>
       <CardFooter className="flex justify-center text-xs text-gray-500">
         <p>Sie haben noch keinen Hive-Account? <a href="https://signup.hive.io" target="_blank" rel="noopener noreferrer" className="text-hive hover:underline">Erstellen Sie einen hier</a></p>
+        <p className="text-gray-600">Wie man einen Hive Account erstellt, habe ich hier <a href="https://peakd.com/hive-121566/@achimmertens/wie-man-einen-hive-account-erstellt" target="_blank" rel="noopener noreferrer" className="text-hive hover:underline"> beschrieben</a>. </p>
+
       </CardFooter>
     </Card>
   );

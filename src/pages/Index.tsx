@@ -93,6 +93,8 @@ const Index = () => {
               <div className="text-center mb-8 max-w-lg mx-auto">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Sie sind noch nicht bei Hive eingeloggt</h2>
                 <p className="text-gray-600">Bitte loggen Sie sich mit Ihrem Hive-Account ein, um Charity-Beiträge zu sehen und upzuvoten.</p>
+                <p className="text-gray-600">Wenn Sie noch keinen Hive-Account haben, können Sie sich <a href="https://signup.hive.io" target="_blank" rel="noopener noreferrer" className="text-hive hover:underline">hier registrieren</a>.</p>
+                <p className="text-gray-600">Wie man einen Hive Account erstellt, habe ich hier <a href="https://peakd.com/hive-121566/@achimmertens/wie-man-einen-hive-account-erstellt" target="_blank" rel="noopener noreferrer" className="text-hive hover:underline"> beschrieben</a>. </p>
               </div>
               <div className="max-w-md mx-auto">
                 <HiveLogin onLogin={handleLogin} />
