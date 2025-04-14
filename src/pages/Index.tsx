@@ -4,11 +4,43 @@ import HiveLogin from '@/components/HiveLogin';
 import HiveWelcome from '@/components/HiveWelcome';
 import { HiveUser, processHiveSignerCallback } from '@/services/hiveAuth';
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [user, setUser] = useState<HiveUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  
+  // Record login to Supabase
+  const recordLogin = async (username: string) => {
+    try {
+      // First, check if the account exists
+      const { data: existingAccount } = await supabase
+        .from('Account')
+        .select('*')
+        .eq('loginname', username)
+        .single();
+      
+      // If account doesn't exist, create it
+      if (!existingAccount) {
+        await supabase
+          .from('Account')
+          .insert({ loginname: username });
+        
+        console.log(`New account created for user: ${username}`);
+      }
+      
+      // Record login in the LoginLog table
+      await supabase
+        .from('LoginLog')
+        .insert({ loginname: username });
+      
+      console.log(`Login recorded for user: ${username}`);
+    } catch (error) {
+      console.error('Error recording login:', error);
+      // Don't block the user login process if recording fails
+    }
+  };
   
   // Check if user was previously logged in or process HiveSigner callback
   useEffect(() => {
@@ -21,6 +53,10 @@ const Index = () => {
       if (hivesignerUser) {
         // User authenticated via HiveSigner
         console.log("User authenticated via HiveSigner:", hivesignerUser);
+        
+        // Record the login in Supabase
+        await recordLogin(hivesignerUser.username);
+        
         setUser(hivesignerUser);
         localStorage.setItem('hiveUser', JSON.stringify(hivesignerUser));
         toast({

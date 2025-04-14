@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HiveLoginProps {
   onLogin: (user: HiveUser) => void;
@@ -64,6 +66,35 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       hiveAuth: isHiveAuthAvailable()
     });
   };
+
+  // Record login to Supabase
+  const recordLogin = async (username: string) => {
+    try {
+      // First, check if the account exists
+      const { data: existingAccount } = await supabase
+        .from('Account')
+        .select('*')
+        .eq('loginname', username)
+        .single();
+      
+      // If account doesn't exist, create it
+      if (!existingAccount) {
+        await supabase
+          .from('Account')
+          .insert({ loginname: username });
+      }
+      
+      // Record login in the LoginLog table
+      await supabase
+        .from('LoginLog')
+        .insert({ loginname: username });
+      
+      console.log(`Login recorded for user: ${username}`);
+    } catch (error) {
+      console.error('Error recording login:', error);
+      // Don't block the user login process if recording fails
+    }
+  };
   
   const handleKeychainLogin = (values: FormValues) => {
     setIsLoading(true);
@@ -72,6 +103,9 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
+        // Record login to Supabase
+        recordLogin(user.username);
+        
         onLogin(user);
         toast({
           title: "Login erfolgreich",
@@ -94,6 +128,9 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
+        // Record login to Supabase
+        recordLogin(user.username);
+        
         onLogin(user);
         toast({
           title: "Login erfolgreich",

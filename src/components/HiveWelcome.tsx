@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { HiveUser } from "@/services/hiveAuth";
-import CharityPosts from './CharityPosts';
+import CharityPostsEnhanced from './CharityPostsEnhanced';
 
 interface HiveWelcomeProps {
   user: HiveUser;
@@ -39,7 +39,7 @@ const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user, onLogout }) => {
       </Card>
 
       <div className="mt-8 max-w-4xl mx-auto">
-        <CharityPosts user={user} />
+        <CharityPostsEnhanced user={user} />
       </div>
     </div>
   );

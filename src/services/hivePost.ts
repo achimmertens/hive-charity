@@ -1,6 +1,4 @@
 
-import { HiveUser } from './hiveAuth';
-
 export interface HivePost {
   author: string;
   permlink: string;
@@ -13,7 +11,41 @@ export interface HivePost {
   community_title?: string;
   payout: number;
   upvoted: boolean;
+  image_url?: string; // Added image URL field
 }
+
+// Extract image URL from post JSON metadata or content
+const extractImageUrl = (post: any): string | undefined => {
+  try {
+    // Try to get image from json_metadata first
+    if (post.json_metadata) {
+      const metadata = JSON.parse(post.json_metadata);
+      
+      // Check for image in metadata.image array
+      if (metadata.image && metadata.image.length > 0) {
+        return metadata.image[0];
+      }
+      
+      // Check for cover_image in metadata
+      if (metadata.cover_image) {
+        return metadata.cover_image;
+      }
+    }
+    
+    // If no image found in metadata, try to extract from body using regex
+    const imgRegex = /https?:\/\/[^\s]+?\.(jpg|jpeg|png|gif|webp)/i;
+    const match = post.body.match(imgRegex);
+    if (match) {
+      return match[0];
+    }
+    
+    // No image found
+    return undefined;
+  } catch (error) {
+    console.error('Error extracting image URL:', error);
+    return undefined;
+  }
+};
 
 // Fetch posts with charity tag or from charity community
 export const fetchCharityPosts = async (): Promise<HivePost[]> => {
@@ -79,7 +111,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       category: post.category,
       tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
-      upvoted: false
+      upvoted: false,
+      image_url: extractImageUrl(post)
     })) : [];
 
     // Process community posts
@@ -94,7 +127,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       community: post.community,
       community_title: post.community_title,
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
-      upvoted: false
+      upvoted: false,
+      image_url: extractImageUrl(post)
     })) : [];
 
     // Process search posts
@@ -107,7 +141,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       category: post.category,
       tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
-      upvoted: false
+      upvoted: false,
+      image_url: extractImageUrl(post)
     })) : [];
 
     // Combine and deduplicate posts
@@ -162,3 +197,6 @@ export const upvotePost = (
     }
   );
 };
+
+// Import the HiveUser type
+import { HiveUser } from './hiveAuth';
