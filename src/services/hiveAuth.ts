@@ -1,7 +1,8 @@
-
 export interface HiveUser {
   username: string;
   loggedIn: boolean;
+  authType?: 'keychain' | 'hiveauth' | 'hivesigner';
+  accessToken?: string; // For HiveSigner
 }
 
 // Check if Hive Keychain is available in the browser
@@ -74,7 +75,8 @@ const performKeychainLogin = (username: string, callback: (user: HiveUser | null
       if (response.success) {
         callback({
           username: response.data.username || username,
-          loggedIn: true
+          loggedIn: true,
+          authType: 'keychain'
         });
       } else {
         callback(null, response.message || "Authentifizierung fehlgeschlagen");
@@ -124,11 +126,91 @@ const performHiveAuthLogin = (username: string, callback: (user: HiveUser | null
     if (username) {
       callback({
         username,
-        loggedIn: true
+        loggedIn: true,
+        authType: 'hiveauth'
       });
     } else {
       callback(null, "Authentifizierung fehlgeschlagen");
     }
+  });
+};
+
+// Login with HiveSigner
+export const loginWithHiveSigner = (callback: (user: HiveUser | null, error?: string) => void): void => {
+  console.log("Attempting to login with HiveSigner");
+
+  const clientId = 'hive-charity-explorer'; // Your application name
+  const redirectUri = window.location.origin; // Redirect back to your app
+  const scope = 'posting'; // We need posting permission to vote
+
+  // Save callback info to localStorage to retrieve after redirect
+  localStorage.setItem('hivesigner_login_pending', 'true');
+  
+  // Redirect to HiveSigner authorization page
+  window.location.href = `https://hivesigner.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
+};
+
+// Process HiveSigner callback after redirect
+export const processHiveSignerCallback = (): Promise<HiveUser | null> => {
+  console.log("Processing HiveSigner callback");
+  
+  // Check if we're expecting a HiveSigner callback
+  if (localStorage.getItem('hivesigner_login_pending') !== 'true') {
+    return Promise.resolve(null);
+  }
+  
+  // Clean up the pending flag
+  localStorage.removeItem('hivesigner_login_pending');
+  
+  // Parse the URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  
+  if (!code) {
+    console.log("No authorization code found in URL");
+    return Promise.resolve(null);
+  }
+  
+  // Clear the code from the URL without reloading the page
+  window.history.replaceState({}, document.title, window.location.pathname);
+  
+  console.log("Authorization code found:", code);
+  
+  // Exchange the authorization code for an access token
+  // Note: In a production app, this should be done in a backend service
+  return fetch('https://hivesigner.com/api/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      code,
+      client_id: 'hive-charity-explorer',
+      client_secret: '', // Usually empty for HiveSigner
+      redirect_uri: window.location.origin,
+      grant_type: 'authorization_code'
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log("Token response:", data);
+    
+    if (data.access_token && data.username) {
+      // Successfully obtained access token
+      return {
+        username: data.username,
+        loggedIn: true,
+        authType: 'hivesigner',
+        accessToken: data.access_token
+      };
+    } else {
+      console.error("Failed to obtain access token:", data);
+      return null;
+    }
+  })
+  .catch(error => {
+    console.error("Error exchanging code for token:", error);
+    return null;
   });
 };
 

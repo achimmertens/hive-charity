@@ -18,24 +18,32 @@ export interface HivePost {
 // Fetch posts with charity tag or from charity community
 export const fetchCharityPosts = async (): Promise<HivePost[]> => {
   try {
-    // Query for posts with #charity tag
+    // Query for posts with #charity tag - increased limit to 30
     const tagQuery = {
       jsonrpc: '2.0',
       method: 'condenser_api.get_discussions_by_created',
-      params: [{ tag: 'charity', limit: 10 }],
+      params: [{ tag: 'charity', limit: 30 }],
       id: 1
     };
 
-    // Query for posts from hive-149312 community
+    // Query for posts from hive-149312 community - increased limit to 30
     const communityQuery = {
       jsonrpc: '2.0',
       method: 'bridge.get_ranked_posts',
-      params: { tag: 'hive-149312', sort: 'created', limit: 10 },
+      params: { tag: 'hive-149312', sort: 'created', limit: 30 },
       id: 2
     };
 
-    // Execute both queries in parallel
-    const [tagResponse, communityResponse] = await Promise.all([
+    // Special search query to find more charity-related posts
+    const searchQuery = {
+      jsonrpc: '2.0',
+      method: 'condenser_api.get_discussions_by_created',
+      params: [{ tag: 'charity', limit: 20 }],
+      id: 3
+    };
+
+    // Execute all queries in parallel
+    const [tagResponse, communityResponse, searchResponse] = await Promise.all([
       fetch('https://api.hive.blog', {
         method: 'POST',
         body: JSON.stringify(tagQuery),
@@ -45,14 +53,24 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
         method: 'POST',
         body: JSON.stringify(communityQuery),
         headers: { 'Content-Type': 'application/json' }
+      }),
+      fetch('https://api.hive.blog', {
+        method: 'POST',
+        body: JSON.stringify(searchQuery),
+        headers: { 'Content-Type': 'application/json' }
       })
     ]);
 
     const tagData = await tagResponse.json();
     const communityData = await communityResponse.json();
+    const searchData = await searchResponse.json();
+
+    console.log("Posts found with charity tag:", tagData.result ? tagData.result.length : 0);
+    console.log("Posts found in charity community:", communityData.result ? communityData.result.length : 0);
+    console.log("Posts found in extended search:", searchData.result ? searchData.result.length : 0);
 
     // Process tag posts
-    const tagPosts = tagData.result.map((post: any) => ({
+    const tagPosts = tagData.result ? tagData.result.map((post: any) => ({
       author: post.author,
       permlink: post.permlink,
       title: post.title,
@@ -62,10 +80,10 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false
-    }));
+    })) : [];
 
     // Process community posts
-    const communityPosts = communityData.result.map((post: any) => ({
+    const communityPosts = communityData.result ? communityData.result.map((post: any) => ({
       author: post.author,
       permlink: post.permlink,
       title: post.title,
@@ -77,13 +95,28 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       community_title: post.community_title,
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false
-    }));
+    })) : [];
 
-    // Combine and deduplicate posts (in case a post is both tagged and in the community)
-    const allPosts = [...tagPosts, ...communityPosts];
+    // Process search posts
+    const searchPosts = searchData.result ? searchData.result.map((post: any) => ({
+      author: post.author,
+      permlink: post.permlink,
+      title: post.title,
+      created: post.created,
+      body: post.body.slice(0, 200) + '...',
+      category: post.category,
+      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      payout: parseFloat(post.pending_payout_value.split(' ')[0]),
+      upvoted: false
+    })) : [];
+
+    // Combine and deduplicate posts
+    const allPosts = [...tagPosts, ...communityPosts, ...searchPosts];
     const uniquePosts = allPosts.filter((post, index, self) =>
       index === self.findIndex((p) => p.author === post.author && p.permlink === post.permlink)
     );
+
+    console.log("Total unique posts found:", uniquePosts.length);
 
     // Sort by created date (newest first)
     return uniquePosts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()).slice(0, 10);

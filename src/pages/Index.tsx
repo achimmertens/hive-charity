@@ -2,26 +2,52 @@
 import React, { useState, useEffect } from 'react';
 import HiveLogin from '@/components/HiveLogin';
 import HiveWelcome from '@/components/HiveWelcome';
-import { HiveUser } from '@/services/hiveAuth';
+import { HiveUser, processHiveSignerCallback } from '@/services/hiveAuth';
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [user, setUser] = useState<HiveUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   
-  // Check if user was previously logged in (from localStorage)
+  // Check if user was previously logged in or process HiveSigner callback
   useEffect(() => {
-    const savedUser = localStorage.getItem('hiveUser');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Failed to parse saved user:', error);
-        localStorage.removeItem('hiveUser');
+    const checkLogin = async () => {
+      setLoading(true);
+      
+      // First, check if this is a HiveSigner callback
+      const hivesignerUser = await processHiveSignerCallback();
+      
+      if (hivesignerUser) {
+        // User authenticated via HiveSigner
+        console.log("User authenticated via HiveSigner:", hivesignerUser);
+        setUser(hivesignerUser);
+        localStorage.setItem('hiveUser', JSON.stringify(hivesignerUser));
+        toast({
+          title: "Login erfolgreich",
+          description: `Willkommen, @${hivesignerUser.username}!`,
+        });
+        setLoading(false);
+        return;
       }
-    }
-  }, []);
+      
+      // If not a HiveSigner callback, check localStorage
+      const savedUser = localStorage.getItem('hiveUser');
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+        } catch (error) {
+          console.error('Failed to parse saved user:', error);
+          localStorage.removeItem('hiveUser');
+        }
+      }
+      
+      setLoading(false);
+    };
+    
+    checkLogin();
+  }, [toast]);
   
   const handleLogin = (loggedInUser: HiveUser) => {
     setUser(loggedInUser);
@@ -36,6 +62,17 @@ const Index = () => {
       description: "Sie wurden erfolgreich abgemeldet.",
     });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-hive mx-auto"></div>
+          <p className="mt-4 text-gray-600">Lade...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-100">

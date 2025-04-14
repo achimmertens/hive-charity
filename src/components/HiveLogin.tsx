@@ -1,16 +1,23 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { loginWithKeychain, loginWithHiveAuth, isHiveKeychainAvailable, isHiveAuthAvailable, HiveUser } from "@/services/hiveAuth";
+import { 
+  loginWithKeychain, 
+  loginWithHiveAuth, 
+  loginWithHiveSigner,
+  isHiveKeychainAvailable, 
+  isHiveAuthAvailable, 
+  HiveUser 
+} from "@/services/hiveAuth";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint, User } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint, User, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Separator } from "@/components/ui/separator";
 
 interface HiveLoginProps {
   onLogin: (user: HiveUser) => void;
@@ -26,7 +33,7 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [keychainAvailable, setKeychainAvailable] = useState<boolean | null>(null);
   const [hiveAuthAvailable, setHiveAuthAvailable] = useState<boolean | null>(null);
-  const [loginMethod, setLoginMethod] = useState<'keychain' | 'hiveauth' | null>(null);
+  const [loginMethod, setLoginMethod] = useState<'keychain' | 'hiveauth' | 'hivesigner' | null>(null);
   const { toast } = useToast();
   
   const form = useForm<FormValues>({
@@ -96,6 +103,24 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
         toast({
           title: "Login fehlgeschlagen",
           description: error || "Unbekannter Fehler aufgetreten",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+  
+  const handleHiveSignerLogin = () => {
+    setIsLoading(true);
+    setLoginMethod('hivesigner');
+    loginWithHiveSigner((user, error) => {
+      // This won't actually be called directly since HiveSigner redirects,
+      // but we'll keep it for consistency
+      if (error) {
+        setIsLoading(false);
+        setLoginMethod(null);
+        toast({
+          title: "Login fehlgeschlagen",
+          description: error,
           variant: "destructive",
         });
       }
@@ -224,6 +249,32 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
               </span>
             )}
           </Button>
+        </div>
+        
+        <Separator className="my-4" />
+        
+        <div className="flex flex-col space-y-2">
+          <Button
+            onClick={handleHiveSignerLogin}
+            disabled={isLoading}
+            variant="secondary"
+            className="border-blue-500 bg-blue-100 text-blue-700 hover:bg-blue-200"
+          >
+            {isLoading && loginMethod === 'hivesigner' ? (
+              <span className="flex items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verbindung zu HiveSigner...
+              </span>
+            ) : (
+              <span className="flex items-center">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Mit HiveSigner anmelden
+              </span>
+            )}
+          </Button>
+          <p className="text-xs text-center text-gray-500 mt-2">
+            HiveSigner leitet Sie zu einer externen Seite weiter, um sich zu authentifizieren.
+          </p>
         </div>
       </CardContent>
       <CardFooter className="flex justify-center text-xs text-gray-500">
