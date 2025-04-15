@@ -1,3 +1,4 @@
+
 export interface HiveUser {
   username: string;
   loggedIn: boolean;
@@ -139,7 +140,8 @@ const performHiveAuthLogin = (username: string, callback: (user: HiveUser | null
 export const loginWithHiveSigner = (callback: (user: HiveUser | null, error?: string) => void): void => {
   console.log("Attempting to login with HiveSigner");
 
-  const clientId = 'hive-charity-explorer'; // Your application name
+  // Fix: Reducing client_id length to 16 characters or less
+  const clientId = 'hivecharity'; // Shortened client ID to prevent the "Input too large" error
   const redirectUri = window.location.origin; // Redirect back to your app
   const scope = 'posting'; // We need posting permission to vote
 
@@ -185,7 +187,7 @@ export const processHiveSignerCallback = (): Promise<HiveUser | null> => {
     },
     body: JSON.stringify({
       code,
-      client_id: 'hive-charity-explorer',
+      client_id: 'hivecharity', // Use the same shortened client ID
       client_secret: '', // Usually empty for HiveSigner
       redirect_uri: window.location.origin,
       grant_type: 'authorization_code'

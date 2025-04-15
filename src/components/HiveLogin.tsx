@@ -18,6 +18,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HiveLoginProps {
   onLogin: (user: HiveUser) => void;
@@ -43,12 +44,9 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
     },
   });
   
-  // Check availability after component mounts
   useEffect(() => {
-    // Initial check
     checkAvailability();
     
-    // Re-check after a delay to ensure extensions are loaded
     const timer = setTimeout(() => {
       checkAvailability();
     }, 1500);
@@ -64,6 +62,30 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       hiveAuth: isHiveAuthAvailable()
     });
   };
+
+  const recordLogin = async (username: string) => {
+    try {
+      const { data: existingAccount } = await supabase
+        .from('Account')
+        .select('*')
+        .eq('loginname', username)
+        .single();
+      
+      if (!existingAccount) {
+        await supabase
+          .from('Account')
+          .insert({ loginname: username });
+      }
+      
+      await supabase
+        .from('loginlog')
+        .insert({ loginname: username });
+      
+      console.log(`Login recorded for user: ${username}`);
+    } catch (error) {
+      console.error('Error recording login:', error);
+    }
+  };
   
   const handleKeychainLogin = (values: FormValues) => {
     setIsLoading(true);
@@ -72,6 +94,8 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
+        recordLogin(user.username);
+        
         onLogin(user);
         toast({
           title: "Login erfolgreich",
@@ -94,6 +118,8 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
       setIsLoading(false);
       setLoginMethod(null);
       if (user) {
+        recordLogin(user.username);
+        
         onLogin(user);
         toast({
           title: "Login erfolgreich",
@@ -113,8 +139,6 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
     setIsLoading(true);
     setLoginMethod('hivesigner');
     loginWithHiveSigner((user, error) => {
-      // This won't actually be called directly since HiveSigner redirects,
-      // but we'll keep it for consistency
       if (error) {
         setIsLoading(false);
         setLoginMethod(null);
