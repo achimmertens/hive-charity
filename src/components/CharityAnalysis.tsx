@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { CharityAnalysis } from '@/utils/charityAnalysis';
 
 interface CharityAnalysisProps {
@@ -13,11 +13,14 @@ export const CharityAnalysisDisplay: React.FC<CharityAnalysisProps> = ({ analysi
   if (loading) {
     return (
       <Card className="w-full">
-        <CardContent className="pt-6">
-          <div className="animate-pulse flex flex-col space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-          </div>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Loader2 className="h-6 w-6 mr-2 animate-spin text-hive" />
+            <span>Der Text wird jetzt analysiert</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-600">Bitte warten Sie, während der Artikel auf caritative Aspekte geprüft wird...</p>
         </CardContent>
       </Card>
     );
