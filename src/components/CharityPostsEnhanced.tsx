@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { de } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { analyzeCharityPost, CharityAnalysis } from '@/utils/charityAnalysis';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
+import { Progress } from "@/components/ui/progress";
 
 interface CharityPostsProps {
   user: HiveUser;
@@ -23,6 +25,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis>>({});
   const [analyzingPosts, setAnalyzingPosts] = useState<boolean>(false);
   const [currentlyAnalyzing, setCurrentlyAnalyzing] = useState<string | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState<number>(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -72,19 +75,53 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   };
 
   const analyzeAllPosts = async () => {
+    if (analyzingPosts) return; // Verhindere mehrfache Klicks
+    
     setAnalyzingPosts(true);
+    setAnalysisProgress(0);
     const newAnalyses: Record<string, CharityAnalysis> = {};
-
-    for (const post of posts) {
-      const postId = `${post.author}/${post.permlink}`;
-      setCurrentlyAnalyzing(postId);
-      const analysis = await analyzeCharityPost(post);
-      newAnalyses[postId] = analysis;
+    const totalPosts = posts.length;
+    
+    try {
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        const postId = `${post.author}/${post.permlink}`;
+        setCurrentlyAnalyzing(postId);
+        
+        try {
+          console.log(`Analyzing post ${i + 1}/${totalPosts}: ${postId}`);
+          const analysis = await analyzeCharityPost(post);
+          newAnalyses[postId] = analysis;
+        } catch (err) {
+          console.error(`Error analyzing post ${postId}:`, err);
+          newAnalyses[postId] = {
+            charyScore: 0,
+            summary: 'Analyse fehlgeschlagen. Bitte versuchen Sie es später erneut.'
+          };
+        }
+        
+        // Update progress
+        const progress = Math.round(((i + 1) / totalPosts) * 100);
+        setAnalysisProgress(progress);
+      }
+      
+      setAnalyses(newAnalyses);
+      toast({
+        title: "Analyse abgeschlossen",
+        description: `${totalPosts} Artikel wurden analysiert`,
+      });
+    } catch (error) {
+      console.error('Error during post analysis:', error);
+      toast({
+        title: "Analyse fehlgeschlagen",
+        description: "Es gab ein Problem bei der Analyse der Beiträge.",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingPosts(false);
+      setCurrentlyAnalyzing(null);
+      setAnalysisProgress(100);
     }
-
-    setAnalyses(newAnalyses);
-    setAnalyzingPosts(false);
-    setCurrentlyAnalyzing(null);
   };
 
   if (loading) {
@@ -133,33 +170,47 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-center">Aktuelle Charity-Beiträge</h2>
-        <Button 
-          onClick={analyzeAllPosts} 
-          disabled={analyzingPosts}
-          className="bg-hive hover:bg-hive-dark"
-        >
-          {analyzingPosts ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Analysiere...
-            </>
-          ) : (
-            'Artikel auf Charity Scannen'
-          )}
-        </Button>
+      <div className="flex flex-col mb-6 space-y-2">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
+          <Button 
+            onClick={analyzeAllPosts} 
+            disabled={analyzingPosts}
+            className="bg-hive hover:bg-hive-dark"
+          >
+            {analyzingPosts ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analysiere...
+              </>
+            ) : (
+              'Artikel auf Charity Scannen'
+            )}
+          </Button>
+        </div>
+        
+        {analyzingPosts && (
+          <div className="w-full">
+            <div className="flex justify-between text-sm mb-1">
+              <span>Analyse läuft...</span>
+              <span>{analysisProgress}%</span>
+            </div>
+            <Progress value={analysisProgress} className="h-2" />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const postId = `${post.author}/${post.permlink}`;
+          const isAnalyzing = analyzingPosts && currentlyAnalyzing === postId;
+          
           return (
             <div key={postId} className="grid md:grid-cols-2 gap-4">
-              <Card key={`${post.author}-${post.permlink}`} className="overflow-hidden transition-shadow hover:shadow-md">
+              <Card className="overflow-hidden transition-shadow hover:shadow-md">
                 <div className="grid md:grid-cols-3 gap-4">
-                  <div className={`${post.image_url ? 'block' : 'hidden'} md:col-span-1 h-48 md:h-full overflow-hidden bg-gray-100`}>
-                    {post.image_url ? (
+                  {post.image_url ? (
+                    <div className="md:col-span-1 h-48 md:h-full overflow-hidden bg-gray-100">
                       <img 
                         src={post.image_url} 
                         alt={post.title}
@@ -169,12 +220,8 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                           (e.target as HTMLImageElement).parentElement!.style.display = 'none';
                         }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                        <span className="text-gray-400">Kein Bild verfügbar</span>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                   
                   <div className={`${post.image_url ? 'md:col-span-2' : 'md:col-span-3'} p-4`}>
                     <CardHeader className="p-0 pb-2">
@@ -273,7 +320,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
 
               <CharityAnalysisDisplay 
                 analysis={analyses[postId]} 
-                loading={analyzingPosts && currentlyAnalyzing === postId}
+                loading={isAnalyzing}
               />
             </div>
           );

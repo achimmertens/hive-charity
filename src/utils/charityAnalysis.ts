@@ -1,5 +1,4 @@
 
-import { supabase } from "@/integrations/supabase/client";
 import { HivePost } from "@/services/hivePost";
 
 export interface CharityAnalysis {
@@ -9,6 +8,11 @@ export interface CharityAnalysis {
 
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
+    console.log('Analyzing post:', post.title);
+    
+    // Verwende den vollständigen Inhalt des Posts
+    const postContent = post.body;
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -87,12 +91,19 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
           },
           {
             role: "user",
-            content: post.body
+            content: postContent
           }
         ],
         temperature: 0.7,
       }),
     });
+
+    // Überprüfen, ob die Antwort erfolgreich war
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('OpenAI API error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+    }
 
     const data = await response.json();
     
@@ -119,6 +130,9 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     // Remove any extra !CHARY labels if present
     summary = summary.replace(/!CHARY:\d+/g, '').trim();
     
+    console.log('Extracted score:', score);
+    console.log('Extracted summary:', summary);
+    
     return {
       charyScore: score,
       summary: summary
@@ -127,7 +141,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     console.error('Error analyzing charity post:', error);
     return {
       charyScore: 0,
-      summary: 'Fehler bei der Analyse.'
+      summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
     };
   }
 }
