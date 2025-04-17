@@ -6,11 +6,6 @@ export interface CharityAnalysis {
   summary: string;
 }
 
-// This would be set via SupaBase environment variables or another secure method
-// For demo purposes, we're using a temporary hardcoded key
-// In production, this should be handled securely through an API
-const OPENAI_API_KEY = "sk-demo-key"; // Replace with real key in production
-
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
     console.log('Analyzing post:', post.title);
@@ -18,8 +13,10 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     // Use the full content of the post
     const postContent = post.body;
     
-    // Check if we have an API key
-    if (!OPENAI_API_KEY || OPENAI_API_KEY === "sk-demo-key") {
+    // Retrieve the OpenAI API key from the Supabase environment
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    
+    if (!OPENAI_API_KEY) {
       console.error('OpenAI API key not configured');
       return {
         charyScore: 0,
@@ -160,3 +157,4 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     };
   }
 }
+
