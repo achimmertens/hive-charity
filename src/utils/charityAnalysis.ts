@@ -1,4 +1,6 @@
+
 import { HivePost } from "@/services/hivePost";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface CharityAnalysis {
   charyScore: number;
@@ -12,44 +14,28 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     // Use the full content of the post
     const postContent = post.body;
     
-    // For client-side applications, we need to handle this differently
-    // We'll need to make a request to a backend service that has access to the API key
-    // For now, we'll use a placeholder approach that will work with the frontend
-    
-    console.log('Sending request to OpenAI API...');
+    // Call our Supabase Edge Function
+    console.log('Sending request to Edge Function...');
     
     try {
-      const response = await fetch('/api/analyze-charity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use Supabase client to call the edge function
+      const { data, error } = await supabase.functions.invoke('analyze-charity', {
         body: JSON.stringify({
           title: post.title,
           content: postContent
         }),
       });
       
-      // If we're developing locally and don't have the backend set up, 
-      // we'll mock a response for testing purposes
-      if (!response.ok) {
-        // This is a fallback for demonstration purposes
-        // In production, you should handle this more gracefully
-        console.warn('Backend API not available, using mock response');
-        
-        // Generate a random score for demonstration
-        const mockScore = Math.floor(Math.random() * 11); // 0-10
-        const mockSummary = mockScore > 5 
-          ? `Der Beitrag zeigt deutliche Anzeichen karitativer Tätigkeiten mit einem CHARY Score von ${mockScore}.`
-          : `Der Beitrag enthält nur begrenzte Hinweise auf karitative Tätigkeiten mit einem CHARY Score von ${mockScore}.`;
-        
-        return {
-          charyScore: mockScore,
-          summary: mockSummary
-        };
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message);
       }
       
-      const data = await response.json();
+      if (!data) {
+        throw new Error('No data returned from edge function');
+      }
+      
+      console.log('Analysis result:', data);
       
       return {
         charyScore: data.score || 0,
@@ -57,10 +43,10 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       };
       
     } catch (error) {
-      console.error('API request failed:', error);
+      console.error('Edge function request failed:', error);
       
-      // Since we don't have a proper backend endpoint yet, let's create a mock analysis
-      // This helps demonstrate the UI while the backend is being set up
+      // Since we might be in development or the edge function might not be deployed yet,
+      // let's provide a fallback mock analysis
       console.log('Using fallback mock analysis for demonstration');
       
       // Parse the content and assign a basic score
