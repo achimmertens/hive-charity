@@ -10,13 +10,21 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
   try {
     console.log('Analyzing post:', post.title);
     
-    // Verwende den vollständigen Inhalt des Posts
+    // Use the full content of the post
     const postContent = post.body;
     
+    // API key should be set in the server environment
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('OpenAI API key not found');
+      throw new Error('OpenAI API key not found');
+    }
+    
+    console.log('Sending request to OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -98,7 +106,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       }),
     });
 
-    // Überprüfen, ob die Antwort erfolgreich war
+    // Check if the response was successful
     if (!response.ok) {
       const errorData = await response.json();
       console.error('OpenAI API error:', errorData);
@@ -109,7 +117,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     
     if (!data.choices || data.choices.length === 0) {
       console.error('No valid response from OpenAI:', data);
-      throw new Error('Keine gültige Antwort von der KI erhalten.');
+      throw new Error('No valid response received from the AI.');
     }
     
     const analysisText = data.choices[0].message.content;
@@ -124,7 +132,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     if (scoreMatch) {
       summary = analysisText.substring(analysisText.indexOf(scoreMatch[0]) + scoreMatch[0].length).trim();
     } else {
-      summary = analysisText.split('\n')[0] || 'Keine eindeutige Analyse verfügbar.';
+      summary = analysisText.split('\n')[0] || 'No clear analysis available.';
     }
     
     // Remove any extra !CHARY labels if present
@@ -139,9 +147,6 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     };
   } catch (error) {
     console.error('Error analyzing charity post:', error);
-    return {
-      charyScore: 0,
-      summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
-    };
+    throw error; // Let the caller handle the error
   }
 }

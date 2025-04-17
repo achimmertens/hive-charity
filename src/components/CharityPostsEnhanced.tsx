@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
-  const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis>>({});
+  const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
   const [analyzingPosts, setAnalyzingPosts] = useState<boolean>(false);
   const [currentlyAnalyzing, setCurrentlyAnalyzing] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<number>(0);
@@ -74,13 +73,51 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
     });
   };
 
+  const analyzePost = async (post: HivePost) => {
+    const postId = `${post.author}/${post.permlink}`;
+    setAnalyses(prev => ({ ...prev, [postId]: null }));
+    
+    try {
+      console.log(`Starting analysis for post: ${postId}`);
+      const analysis = await analyzeCharityPost(post);
+      console.log(`Analysis complete for post ${postId}:`, analysis);
+      
+      setAnalyses(prev => ({ 
+        ...prev, 
+        [postId]: analysis 
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error(`Error analyzing post ${postId}:`, error);
+      setAnalyses(prev => ({ 
+        ...prev, 
+        [postId]: {
+          charyScore: 0,
+          summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
+        }
+      }));
+      
+      return false;
+    }
+  };
+
   const analyzeAllPosts = async () => {
-    if (analyzingPosts) return; // Verhindere mehrfache Klicks
+    if (analyzingPosts) return;
     
     setAnalyzingPosts(true);
     setAnalysisProgress(0);
-    const newAnalyses: Record<string, CharityAnalysis> = {};
+    
+    const initialAnalyses: Record<string, CharityAnalysis | null> = {};
+    posts.forEach(post => {
+      const postId = `${post.author}/${post.permlink}`;
+      initialAnalyses[postId] = null;
+    });
+    setAnalyses(initialAnalyses);
+    
     const totalPosts = posts.length;
+    let successCount = 0;
+    let failCount = 0;
     
     try {
       for (let i = 0; i < posts.length; i++) {
@@ -88,27 +125,20 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
         const postId = `${post.author}/${post.permlink}`;
         setCurrentlyAnalyzing(postId);
         
-        try {
-          console.log(`Analyzing post ${i + 1}/${totalPosts}: ${postId}`);
-          const analysis = await analyzeCharityPost(post);
-          newAnalyses[postId] = analysis;
-        } catch (err) {
-          console.error(`Error analyzing post ${postId}:`, err);
-          newAnalyses[postId] = {
-            charyScore: 0,
-            summary: 'Analyse fehlgeschlagen. Bitte versuchen Sie es später erneut.'
-          };
+        const success = await analyzePost(post);
+        if (success) {
+          successCount++;
+        } else {
+          failCount++;
         }
         
-        // Update progress
         const progress = Math.round(((i + 1) / totalPosts) * 100);
         setAnalysisProgress(progress);
       }
       
-      setAnalyses(newAnalyses);
       toast({
         title: "Analyse abgeschlossen",
-        description: `${totalPosts} Artikel wurden analysiert`,
+        description: `${successCount} Artikel wurden erfolgreich analysiert. ${failCount} Fehler.`,
       });
     } catch (error) {
       console.error('Error during post analysis:', error);
@@ -203,7 +233,8 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
       <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const postId = `${post.author}/${post.permlink}`;
-          const isAnalyzing = analyzingPosts && currentlyAnalyzing === postId;
+          const isAnalyzing = currentlyAnalyzing === postId;
+          const analysis = analyses[postId];
           
           return (
             <div key={postId} className="grid md:grid-cols-2 gap-4">
@@ -319,8 +350,8 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
               </Card>
 
               <CharityAnalysisDisplay 
-                analysis={analyses[postId]} 
-                loading={isAnalyzing}
+                analysis={analysis} 
+                loading={analysis === null}
               />
             </div>
           );
