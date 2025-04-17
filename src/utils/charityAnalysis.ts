@@ -6,6 +6,11 @@ export interface CharityAnalysis {
   summary: string;
 }
 
+// This would be set via SupaBase environment variables or another secure method
+// For demo purposes, we're using a temporary hardcoded key
+// In production, this should be handled securely through an API
+const OPENAI_API_KEY = "sk-demo-key"; // Replace with real key in production
+
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
     console.log('Analyzing post:', post.title);
@@ -13,18 +18,20 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     // Use the full content of the post
     const postContent = post.body;
     
-    // API key should be set in the server environment
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.error('OpenAI API key not found');
-      throw new Error('OpenAI API key not found');
+    // Check if we have an API key
+    if (!OPENAI_API_KEY || OPENAI_API_KEY === "sk-demo-key") {
+      console.error('OpenAI API key not configured');
+      return {
+        charyScore: 0,
+        summary: "API-Schlüssel nicht konfiguriert. Bitte konfigurieren Sie den OpenAI API-Schlüssel für die Analyse."
+      };
     }
     
     console.log('Sending request to OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -147,6 +154,9 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     };
   } catch (error) {
     console.error('Error analyzing charity post:', error);
-    throw error; // Let the caller handle the error
+    return {
+      charyScore: 0,
+      summary: "Fehler bei der Analyse. Bitte versuchen Sie es später erneut."
+    };
   }
 }
