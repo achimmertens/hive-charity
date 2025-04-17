@@ -6,17 +6,32 @@ export interface CharityAnalysis {
   summary: string;
 }
 
+// This would be set via SupaBase environment variables or another secure method
+// For demo purposes, we're using a temporary hardcoded key
+// In production, this should be handled securely through an API
+const OPENAI_API_KEY = "sk-demo-key"; // Replace with real key in production
+
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
     console.log('Analyzing post:', post.title);
     
-    // Verwende den vollständigen Inhalt des Posts
+    // Use the full content of the post
     const postContent = post.body;
     
+    // Check if we have an API key
+    if (!OPENAI_API_KEY || OPENAI_API_KEY === "sk-demo-key") {
+      console.error('OpenAI API key not configured');
+      return {
+        charyScore: 0,
+        summary: "API-Schlüssel nicht konfiguriert. Bitte konfigurieren Sie den OpenAI API-Schlüssel für die Analyse."
+      };
+    }
+    
+    console.log('Sending request to OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -98,7 +113,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       }),
     });
 
-    // Überprüfen, ob die Antwort erfolgreich war
+    // Check if the response was successful
     if (!response.ok) {
       const errorData = await response.json();
       console.error('OpenAI API error:', errorData);
@@ -109,7 +124,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     
     if (!data.choices || data.choices.length === 0) {
       console.error('No valid response from OpenAI:', data);
-      throw new Error('Keine gültige Antwort von der KI erhalten.');
+      throw new Error('No valid response received from the AI.');
     }
     
     const analysisText = data.choices[0].message.content;
@@ -124,7 +139,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     if (scoreMatch) {
       summary = analysisText.substring(analysisText.indexOf(scoreMatch[0]) + scoreMatch[0].length).trim();
     } else {
-      summary = analysisText.split('\n')[0] || 'Keine eindeutige Analyse verfügbar.';
+      summary = analysisText.split('\n')[0] || 'No clear analysis available.';
     }
     
     // Remove any extra !CHARY labels if present
@@ -141,7 +156,7 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     console.error('Error analyzing charity post:', error);
     return {
       charyScore: 0,
-      summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
+      summary: "Fehler bei der Analyse. Bitte versuchen Sie es später erneut."
     };
   }
 }
