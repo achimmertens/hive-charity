@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,17 +16,21 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
+      console.error('OpenAI API key not found in environment variables');
       throw new Error('OpenAI API key not found in environment variables');
     }
 
     // Parse the request body
-    const { title, content } = await req.json();
+    const requestData = await req.json();
+    const { title, content } = requestData;
     
     if (!title || !content) {
+      console.error('Missing required parameters:', { title: !!title, content: !!content });
       throw new Error('Missing required parameters: title and/or content');
     }
 
     console.log('Analyzing charity post:', title);
+    console.log('Content length:', content.length);
 
     // Prepare the prompt for OpenAI
     const prompt = `
@@ -49,6 +52,7 @@ serve(async (req) => {
     `;
 
     // Call OpenAI API
+    console.log('Sending request to OpenAI API...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -63,18 +67,22 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('OpenAI API response received');
+    
     const assistantMessage = data.choices[0].message.content;
+    console.log('Assistant message:', assistantMessage);
     
     let result;
     try {
       // Try to parse the response as JSON
       result = JSON.parse(assistantMessage);
+      console.log('Successfully parsed JSON response');
     } catch (error) {
       console.log('Failed to parse JSON response, extracting manually');
       
@@ -96,13 +104,26 @@ serve(async (req) => {
         : "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
       
       result = { score, summary };
+      console.log('Manually extracted result:', result);
     }
     
-    console.log('Analysis result:', result);
+    // Validate that we have a score and summary
+    if (!result.score && result.score !== 0) {
+      result.score = 0;
+    }
+    
+    if (!result.summary) {
+      result.summary = "Keine klare Analyse verfügbar.";
+    }
+    
+    console.log('Final analysis result:', result);
 
     // Return the final result
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        score: result.score,
+        summary: result.summary
+      }),
       { 
         headers: { 
           ...corsHeaders,
@@ -116,11 +137,13 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({
+        error: true,
+        message: error.message,
         score: 0,
         summary: `Fehler bei der Analyse: ${error.message}`
       }),
       { 
-        status: 500,
+        status: 200, // Returning 200 even for errors to ensure client can process them
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json' 
