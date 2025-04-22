@@ -11,7 +11,8 @@ export interface HivePost {
   community_title?: string;
   payout: number;
   upvoted: boolean;
-  image_url?: string; // Added image URL field
+  image_url?: string;
+  author_reputation?: number; // Added author_reputation property
 }
 
 // Extract image URL from post JSON metadata or content
