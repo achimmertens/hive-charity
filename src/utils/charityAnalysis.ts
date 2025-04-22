@@ -43,6 +43,25 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       }
       
       console.log('Analysis result:', data);
+
+      // Store the analysis result in the database
+      const analysisData = {
+        article_url: `https://peakd.com/@${post.author}/${post.permlink}`,
+        author_name: post.author,
+        created_at: post.created,
+        charity_score: data.score,
+        openai_response: data.summary,
+        image_url: post.image_url,
+        author_reputation: post.author_reputation
+      };
+
+      const { error: insertError } = await supabase
+        .from('charity_analysis_results')
+        .insert(analysisData);
+
+      if (insertError) {
+        console.error('Error storing analysis result:', insertError);
+      }
       
       return {
         charyScore: typeof data.score === 'number' ? data.score : 0,

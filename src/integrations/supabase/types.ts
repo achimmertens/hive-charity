@@ -45,6 +45,42 @@ export type Database = {
         }
         Relationships: []
       }
+      charity_analysis_results: {
+        Row: {
+          analyzed_at: string
+          article_url: string
+          author_name: string
+          author_reputation: number | null
+          charity_score: number
+          created_at: string
+          id: string
+          image_url: string | null
+          openai_response: string
+        }
+        Insert: {
+          analyzed_at?: string
+          article_url: string
+          author_name: string
+          author_reputation?: number | null
+          charity_score: number
+          created_at: string
+          id?: string
+          image_url?: string | null
+          openai_response: string
+        }
+        Update: {
+          analyzed_at?: string
+          article_url?: string
+          author_name?: string
+          author_reputation?: number | null
+          charity_score?: number
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          openai_response?: string
+        }
+        Relationships: []
+      }
       loginlog: {
         Row: {
           id: number
