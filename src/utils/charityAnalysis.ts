@@ -28,11 +28,12 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       
       if (error) {
         console.error('Edge function error:', error);
-        throw new Error(error.message);
+        return generateMockAnalysis(postContent);
       }
       
       if (!data) {
-        throw new Error('No data returned from edge function');
+        console.warn('No data returned from edge function');
+        return generateMockAnalysis(postContent);
       }
       
       // If the edge function returns an error property, use fallback
