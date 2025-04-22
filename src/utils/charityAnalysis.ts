@@ -10,6 +10,7 @@ export interface CharityAnalysis {
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
     console.log('Analyzing post:', post.title);
+    console.log('Author reputation:', post.author_reputation);
     
     // Use the full content of the post
     const postContent = post.body;
@@ -55,12 +56,16 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         author_reputation: post.author_reputation
       };
 
+      console.log('Saving to database:', analysisData);
+
       const { error: insertError } = await supabase
         .from('charity_analysis_results')
         .insert(analysisData);
 
       if (insertError) {
         console.error('Error storing analysis result:', insertError);
+      } else {
+        console.log('Successfully saved to database');
       }
       
       return {

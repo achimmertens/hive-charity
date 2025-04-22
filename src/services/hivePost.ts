@@ -1,4 +1,3 @@
-
 export interface HivePost {
   author: string;
   permlink: string;
@@ -46,6 +45,14 @@ const extractImageUrl = (post: any): string | undefined => {
     console.error('Error extracting image URL:', error);
     return undefined;
   }
+};
+
+// Convert raw reputation value to human-readable number
+const formatReputation = (rawReputation: number): number => {
+  if (!rawReputation) return 0;
+  
+  // Divide the raw reputation score by 10^12 as mentioned
+  return Math.round(rawReputation / 1000000000000);
 };
 
 // Fetch posts with charity tag or from charity community
@@ -113,7 +120,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false,
-      image_url: extractImageUrl(post)
+      image_url: extractImageUrl(post),
+      author_reputation: formatReputation(post.author_reputation)
     })) : [];
 
     // Process community posts
@@ -129,7 +137,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       community_title: post.community_title,
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false,
-      image_url: extractImageUrl(post)
+      image_url: extractImageUrl(post),
+      author_reputation: formatReputation(post.author_reputation)
     })) : [];
 
     // Process search posts
@@ -143,7 +152,8 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false,
-      image_url: extractImageUrl(post)
+      image_url: extractImageUrl(post),
+      author_reputation: formatReputation(post.author_reputation)
     })) : [];
 
     // Combine and deduplicate posts
