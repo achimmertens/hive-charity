@@ -11,10 +11,54 @@ import { Badge } from "@/components/ui/badge";
 import { analyzeCharityPost, CharityAnalysis } from '@/utils/charityAnalysis';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CharityPostsProps {
   user: HiveUser;
 }
+
+const fetchAnalyzedArticleUrls = async (): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('charity_analysis_results')
+      .select('article_url');
+    if (error) {
+      console.warn("Error fetching analysis history:", error);
+      return [];
+    }
+    return (data ?? []).map((entry: any) => entry.article_url);
+  } catch (err) {
+    console.error("DB lookup error:", err);
+    return [];
+  }
+};
+
+const fetchCharyInComments = async (author: string, permlink: string): Promise<boolean> => {
+  try {
+    const request = {
+      jsonrpc: "2.0",
+      method: "bridge.get_discussion",
+      params: { author, permlink },
+      id: 123
+    };
+    const res = await fetch("https://api.hive.blog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const raw = await res.json();
+    if (!raw.result || !raw.result.replies) return false;
+
+    return raw.result.replies.some(
+      (reply: any) =>
+        typeof reply.body === "string" &&
+        reply.body.toLowerCase().includes("!chary")
+    );
+  } catch (e) {
+    console.error("Failed checking !CHARY in comments for", author, permlink, e);
+    return false;
+  }
+};
 
 const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [posts, setPosts] = useState<HivePost[]>([]);
@@ -25,20 +69,93 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [analyzingPosts, setAnalyzingPosts] = useState<boolean>(false);
   const [currentlyAnalyzing, setCurrentlyAnalyzing] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<number>(0);
+  const [charyInComments, setCharyInComments] = useState<Record<string, boolean>>({});
+  const [fetchingPosts, setFetchingPosts] = useState<boolean>(false);
   const { toast } = useToast();
 
   useEffect(() => {
     const loadPosts = async () => {
+      setFetchingPosts(true);
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-        const charityPosts = await fetchCharityPosts();
-        setPosts(charityPosts);
+        const analyzedArticleUrls = await fetchAnalyzedArticleUrls();
+
+        let charityPosts = await fetchCharityPosts();
+
+        const additionalQuery = {
+          jsonrpc: '2.0',
+          method: 'condenser_api.get_discussions_by_created',
+          params: [{ tag: 'help', limit: 20 }],
+          id: 3
+        };
+
+        const resp = await fetch('https://api.hive.blog', {
+          method: 'POST',
+          body: JSON.stringify(additionalQuery),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        let helpTagPosts: HivePost[] = [];
+        if (data && data.result) {
+          helpTagPosts = data.result.map((post: any) => ({
+            author: post.author,
+            permlink: post.permlink,
+            title: post.title,
+            created: post.created,
+            body: post.body.slice(0, 200) + "...",
+            category: post.category,
+            tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+            payout: parseFloat(post.pending_payout_value.split(" ")[0]),
+            upvoted: false,
+            image_url: post.json_metadata ? (() => {
+              try {
+                const meta = JSON.parse(post.json_metadata);
+                if (meta.image && meta.image.length > 0) return meta.image[0];
+                if (meta.cover_image) return meta.cover_image;
+                return undefined;
+              } catch { return undefined; }
+            })() : undefined,
+            author_reputation: post.author_reputation
+              ? Math.round(post.author_reputation / 1000000000000)
+              : 0,
+          }));
+        }
+
+        const allPosts = [...charityPosts, ...helpTagPosts];
+        const uniquePosts = allPosts.filter(
+          (post, idx, arr) =>
+            arr.findIndex(
+              (p) => p.author === post.author && p.permlink === post.permlink
+            ) === idx
+        );
+
+        const filteredPosts = uniquePosts.filter(
+          (p) =>
+            !analyzedArticleUrls.includes(
+              `https://peakd.com/@${p.author}/${p.permlink}`
+            )
+        );
+        setPosts(filteredPosts);
+
+        const charyStatusMap: Record<string, boolean> = {};
+
+        for (const post of filteredPosts) {
+          const postId = `${post.author}/${post.permlink}`;
+          if (charyInComments[postId] !== undefined) {
+            charyStatusMap[postId] = charyInComments[postId];
+          } else {
+            charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
+          }
+        }
+        setCharyInComments(charyStatusMap);
+
       } catch (err) {
-        console.error('Failed to fetch charity posts:', err);
+        console.error('Fehler beim Suchen nach Charity-Artikeln:', err);
         setError('Fehler beim Laden der Charity-Beiträge');
       } finally {
         setLoading(false);
+        setFetchingPosts(false);
       }
     };
 
@@ -203,20 +320,39 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
       <div className="flex flex-col mb-6 space-y-2">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
-          <Button 
-            onClick={analyzeAllPosts} 
-            disabled={analyzingPosts}
-            className="bg-hive hover:bg-hive-dark"
-          >
-            {analyzingPosts ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Analysiere...
-              </>
-            ) : (
-              'Artikel auf Charity Scannen'
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={fetchFilteredCharityPosts}
+              disabled={fetchingPosts}
+              className="bg-hive hover:bg-hive-dark"
+            >
+              {fetchingPosts ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                  </svg>
+                  Suche...
+                </>
+              ) : (
+                'Weitere Artikel suchen'
+              )}
+            </Button>
+            <Button 
+              onClick={analyzeAllPosts} 
+              disabled={analyzingPosts}
+              className="bg-hive hover:bg-hive-dark"
+            >
+              {analyzingPosts ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analysiere...
+                </>
+              ) : (
+                'Artikel auf Charity Scannen'
+              )}
+            </Button>
+          </div>
         </div>
         
         {analyzingPosts && (
@@ -235,7 +371,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           const postId = `${post.author}/${post.permlink}`;
           const isAnalyzing = currentlyAnalyzing === postId;
           const analysis = analyses[postId];
-          
+          const showChary = postId in charyInComments;
           return (
             <div key={postId} className="grid md:grid-cols-2 gap-4">
               <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -255,36 +391,41 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                   ) : null}
                   
                   <div className={`${post.image_url ? 'md:col-span-2' : 'md:col-span-3'} p-4`}>
-                    <CardHeader className="p-0 pb-2">
-                      <CardTitle className="text-xl line-clamp-2">
-                        <a 
-                          href={`https://peakd.com/@${post.author}/${post.permlink}`}
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="hover:text-hive transition-colors"
-                        >
-                          {post.title}
-                        </a>
-                      </CardTitle>
-                      <CardDescription className="flex items-center mt-2 space-x-4 text-sm text-gray-500">
-                        <span className="flex items-center">
-                          <User className="h-4 w-4 mr-1" /> 
+                    <CardHeader className="p-0 pb-2 flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl line-clamp-2">
                           <a 
-                            href={`https://peakd.com/@${post.author}`}
+                            href={`https://peakd.com/@${post.author}/${post.permlink}`}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="hover:text-hive transition-colors"
                           >
-                            @{post.author}
+                            {post.title}
                           </a>
-                        </span>
-                        <span className="flex items-center">
-                          <Calendar className="h-4 w-4 mr-1" /> 
-                          {formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}
-                        </span>
-                      </CardDescription>
+                        </CardTitle>
+                        <CardDescription className="flex items-center mt-2 space-x-4 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <User className="h-4 w-4 mr-1" /> 
+                            <a 
+                              href={`https://peakd.com/@${post.author}`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="hover:text-hive transition-colors"
+                            >
+                              @{post.author}
+                            </a>
+                          </span>
+                          <span className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-1" /> 
+                            {formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}
+                          </span>
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox checked={showChary && charyInComments[postId]} tabIndex={-1} readOnly id={`charycb_${postId}`} />
+                        <label htmlFor={`charycb_${postId}`} className="text-xs select-none">!CHARY</label>
+                      </div>
                     </CardHeader>
-                    
                     <CardContent className="p-0 py-4">
                       <p className="text-gray-600 line-clamp-3 mb-4">{post.body}</p>
                       
@@ -303,12 +444,10 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                         )}
                       </div>
                     </CardContent>
-                    
                     <CardFooter className="p-0 flex justify-between items-center">
                       <div className="flex items-center text-sm text-gray-500">
                         <span className="font-semibold text-green-600">${post.payout.toFixed(2)}</span>
                       </div>
-                      
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
@@ -318,7 +457,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                         >
                           <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
                         </Button>
-                        
                         <Button
                           variant="default"
                           size="sm"
@@ -348,7 +486,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                   </div>
                 </div>
               </Card>
-
               <CharityAnalysisDisplay 
                 analysis={analysis} 
                 loading={analysis === null}
