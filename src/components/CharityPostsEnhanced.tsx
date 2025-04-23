@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,14 +74,12 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [fetchingPosts, setFetchingPosts] = useState<boolean>(false);
   const { toast } = useToast();
 
-  const fetchFilteredCharityPosts = async () => {
+  const fetchLatestCharityPosts = async () => {
     setFetchingPosts(true);
     setLoading(true);
     setError(null);
     try {
-      const analyzedArticleUrls = await fetchAnalyzedArticleUrls();
-
-      let charityPosts = await fetchCharityPosts();
+      const charityPosts = await fetchCharityPosts();
 
       const additionalQuery = {
         jsonrpc: '2.0',
@@ -123,7 +120,60 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
         }));
       }
 
-      const allPosts = [...charityPosts, ...helpTagPosts];
+      const searchForCharyCommentPosts = async (): Promise<HivePost[]> => {
+        const searchPostsQuery = {
+          jsonrpc: '2.0',
+          method: 'condenser_api.get_discussions_by_trending',
+          params: [{ tag: '', limit: 20 }],
+          id: 100
+        };
+        const searchResp = await fetch('https://api.hive.blog', {
+          method: 'POST',
+          body: JSON.stringify(searchPostsQuery),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const searchData = await searchResp.json();
+        let result: HivePost[] = [];
+        if (searchData && searchData.result) {
+          for (const post of searchData.result) {
+            const hasChary = await fetchCharyInComments(post.author, post.permlink);
+            if (hasChary) {
+              result.push({
+                author: post.author,
+                permlink: post.permlink,
+                title: post.title,
+                created: post.created,
+                body: post.body.slice(0, 200) + "...",
+                category: post.category,
+                tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+                payout: parseFloat(post.pending_payout_value.split(" ")[0]),
+                upvoted: false,
+                image_url: post.json_metadata ? (() => {
+                  try {
+                    const meta = JSON.parse(post.json_metadata);
+                    if (meta.image && meta.image.length > 0) return meta.image[0];
+                    if (meta.cover_image) return meta.cover_image;
+                    return undefined;
+                  } catch { return undefined; }
+                })() : undefined,
+                author_reputation: post.author_reputation
+                  ? Math.round(post.author_reputation / 1000000000000)
+                  : 0,
+              });
+              if (result.length >= 10) break;
+            }
+          }
+        }
+        return result;
+      };
+
+      const charyPosts = await searchForCharyCommentPosts();
+
+      const allPosts = [
+        ...charityPosts,
+        ...helpTagPosts,
+        ...charyPosts
+      ];
       const uniquePosts = allPosts.filter(
         (post, idx, arr) =>
           arr.findIndex(
@@ -131,23 +181,15 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           ) === idx
       );
 
-      const filteredPosts = uniquePosts.filter(
-        (p) =>
-          !analyzedArticleUrls.includes(
-            `https://peakd.com/@${p.author}/${p.permlink}`
-          )
-      );
-      setPosts(filteredPosts);
+      const sortedNewestPosts = uniquePosts
+        .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+        .slice(0, 10);
+      setPosts(sortedNewestPosts);
 
       const charyStatusMap: Record<string, boolean> = {};
-
-      for (const post of filteredPosts) {
+      for (const post of sortedNewestPosts) {
         const postId = `${post.author}/${post.permlink}`;
-        if (charyInComments[postId] !== undefined) {
-          charyStatusMap[postId] = charyInComments[postId];
-        } else {
-          charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
-        }
+        charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
       }
       setCharyInComments(charyStatusMap);
 
@@ -161,7 +203,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   };
 
   useEffect(() => {
-    fetchFilteredCharityPosts();
+    fetchLatestCharityPosts();
   }, []);
 
   const handleUpvote = (post: HivePost) => {
@@ -324,7 +366,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
           <div className="flex gap-2">
             <Button
-              onClick={fetchFilteredCharityPosts}
+              onClick={fetchLatestCharityPosts}
               disabled={fetchingPosts}
               className="bg-hive hover:bg-hive-dark"
             >
@@ -334,7 +376,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                   </svg>
-                  Suche...
+                  Weitere Artikel suchen...
                 </>
               ) : (
                 'Weitere Artikel suchen'
@@ -356,7 +398,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
             </Button>
           </div>
         </div>
-        
         {analyzingPosts && (
           <div className="w-full">
             <div className="flex justify-between text-sm mb-1">
@@ -367,13 +408,12 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           </div>
         )}
       </div>
-
       <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const postId = `${post.author}/${post.permlink}`;
           const isAnalyzing = currentlyAnalyzing === postId;
           const analysis = analyses[postId];
-          const showChary = postId in charyInComments;
+          const charyStatus = charyInComments[postId];
           return (
             <div key={postId} className="grid md:grid-cols-2 gap-4">
               <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -423,10 +463,11 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                           </span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox checked={showChary && charyInComments[postId]} tabIndex={-1} id={`charycb_${postId}`} />
-                        <label htmlFor={`charycb_${postId}`} className="text-xs select-none">!CHARY</label>
-                      </div>
+                      {charyStatus ? (
+                        <div className="ml-2">
+                          <Checkbox checked tabIndex={-1} id={`charycb_${postId}`} aria-label="!CHARY" />
+                        </div>
+                      ) : null}
                     </CardHeader>
                     <CardContent className="p-0 py-4">
                       <p className="text-gray-600 line-clamp-3 mb-4">{post.body}</p>

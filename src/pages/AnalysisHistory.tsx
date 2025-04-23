@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -14,8 +14,43 @@ import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Card } from "@/components/ui/card";
 import { AlertTriangle, ExternalLink } from 'lucide-react';
+import SortableTableHeader from "@/components/SortableTableHeader";
+
+const columns = [
+  { key: 'author_name', label: 'Autor' },
+  { key: 'author_reputation', label: 'Reputation' },
+  { key: 'charity_score', label: 'Charity Score' },
+  { key: 'created_at', label: 'Erstellt am' },
+  { key: 'title', label: 'Artikel-Titel' },
+];
+
+const descendingComparator = (a: any, b: any, orderBy: string) => {
+  if (a[orderBy] < b[orderBy]) return 1;
+  if (a[orderBy] > b[orderBy]) return -1;
+  return 0;
+};
+const ascendingComparator = (a: any, b: any, orderBy: string) => {
+  if (a[orderBy] < b[orderBy]) return -1;
+  if (a[orderBy] > b[orderBy]) return 1;
+  return 0;
+};
+
+function getTitleFromUrl(url: string, openai_response: string): string {
+  // Tries to extract the title from the OpenAI summary or the URL
+  if (openai_response && openai_response.length > 0) {
+    const first = openai_response.split('\n')[0];
+    if (first.length < 80) return first;
+  }
+  if (!url) return "";
+  const match = url.match(/\/@[^\/]+\/(.*)$/);
+  if (match && match[1]) return decodeURIComponent(match[1]).slice(0, 52);
+  return url.slice(0, 52);
+}
 
 const AnalysisHistory = () => {
+  const [sortKey, setSortKey] = useState('analyzed_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
   const { data: analyses, isLoading, error } = useQuery({
     queryKey: ['charityAnalyses'],
     queryFn: async () => {
@@ -23,11 +58,33 @@ const AnalysisHistory = () => {
         .from('charity_analysis_results')
         .select('*')
         .order('analyzed_at', { ascending: false });
-      
       if (error) throw error;
-      return data;
+      // Add pseudo title for sorting
+      const analysesWithTitle = (data ?? []).map(a => ({
+        ...a,
+        title: getTitleFromUrl(a.article_url, a.openai_response)
+      }));
+      return analysesWithTitle;
     }
   });
+
+  const handleSort = (key: string) => {
+    if (key === sortKey) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('desc');
+    }
+  };
+
+  let sortedAnalyses = analyses ?? [];
+  if (sortKey && sortedAnalyses.length > 0) {
+    sortedAnalyses = [...sortedAnalyses].sort((a, b) =>
+      sortDirection === 'asc'
+        ? ascendingComparator(a, b, sortKey)
+        : descendingComparator(a, b, sortKey)
+    );
+  }
 
   if (isLoading) {
     return (
@@ -50,7 +107,7 @@ const AnalysisHistory = () => {
     );
   }
 
-  if (!analyses || analyses.length === 0) {
+  if (!sortedAnalyses || sortedAnalyses.length === 0) {
     return (
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
@@ -76,17 +133,24 @@ const AnalysisHistory = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Autor</TableHead>
-                <TableHead>Reputation</TableHead>
-                <TableHead>Charity Score</TableHead>
-                <TableHead>Erstellt am</TableHead>
+                {columns.map(col =>
+                  <SortableTableHeader
+                    key={col.key}
+                    column={col.key}
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  >
+                    {col.label}
+                  </SortableTableHeader>
+                )}
                 <TableHead>Analysiert am</TableHead>
                 <TableHead>OpenAI Analyse</TableHead>
                 <TableHead>Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {analyses?.map((analysis) => (
+              {sortedAnalyses?.map((analysis) => (
                 <TableRow key={analysis.id}>
                   <TableCell>
                     <a 
@@ -114,6 +178,9 @@ const AnalysisHistory = () => {
                   </TableCell>
                   <TableCell>
                     {analysis.created_at ? format(new Date(analysis.created_at), 'PPp', { locale: de }) : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    {analysis.title}
                   </TableCell>
                   <TableCell>
                     {format(new Date(analysis.analyzed_at), 'PPp', { locale: de })}
