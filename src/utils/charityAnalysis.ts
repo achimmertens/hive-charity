@@ -53,7 +53,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         charity_score: data.score,
         openai_response: data.summary,
         image_url: post.image_url,
-        author_reputation: post.author_reputation
+        author_reputation: post.author_reputation,
+        analyzed_at: new Date().toISOString()
       };
 
       console.log('Saving to database:', analysisData);
