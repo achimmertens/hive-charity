@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +69,17 @@ const AnalysisHistory = () => {
     }
   });
 
+  // Initialize sortedAnalyses first, before using it
+  let sortedAnalyses = analyses ?? [];
+  if (sortKey && sortedAnalyses.length > 0) {
+    sortedAnalyses = [...sortedAnalyses].sort((a, b) =>
+      sortDirection === 'asc'
+        ? ascendingComparator(a, b, sortKey)
+        : descendingComparator(a, b, sortKey)
+    );
+  }
+
+  // Now we can use sortedAnalyses
   const charyMap = useCharyInComments(sortedAnalyses);
 
   const handleSort = (key: string) => {
@@ -78,15 +90,6 @@ const AnalysisHistory = () => {
       setSortDirection('desc');
     }
   };
-
-  let sortedAnalyses = analyses ?? [];
-  if (sortKey && sortedAnalyses.length > 0) {
-    sortedAnalyses = [...sortedAnalyses].sort((a, b) =>
-      sortDirection === 'asc'
-        ? ascendingComparator(a, b, sortKey)
-        : descendingComparator(a, b, sortKey)
-    );
-  }
 
   if (isLoading) {
     return (
@@ -189,6 +192,9 @@ const AnalysisHistory = () => {
                       {analysis.title}
                     </TableCell>
                     <TableCell>
+                      {charyKey && charyMap[charyKey] ? <span className="text-hive text-lg font-bold">x</span> : ""}
+                    </TableCell>
+                    <TableCell>
                       {format(new Date(analysis.analyzed_at), 'PPp', { locale: de })}
                     </TableCell>
                     <TableCell className="max-w-md">
@@ -216,9 +222,6 @@ const AnalysisHistory = () => {
                           </a>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {charyKey && charyMap[charyKey] ? <span className="text-hive text-lg font-bold">x</span> : ""}
                     </TableCell>
                   </TableRow>
                 );
