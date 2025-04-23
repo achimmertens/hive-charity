@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { analyzeCharityPost, CharityAnalysis } from '@/utils/charityAnalysis';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CharityPostsProps {
   user: HiveUser;
@@ -73,93 +75,93 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [fetchingPosts, setFetchingPosts] = useState<boolean>(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const loadPosts = async () => {
-      setFetchingPosts(true);
-      setLoading(true);
-      setError(null);
-      try {
-        const analyzedArticleUrls = await fetchAnalyzedArticleUrls();
+  const fetchFilteredCharityPosts = async () => {
+    setFetchingPosts(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const analyzedArticleUrls = await fetchAnalyzedArticleUrls();
 
-        let charityPosts = await fetchCharityPosts();
+      let charityPosts = await fetchCharityPosts();
 
-        const additionalQuery = {
-          jsonrpc: '2.0',
-          method: 'condenser_api.get_discussions_by_created',
-          params: [{ tag: 'help', limit: 20 }],
-          id: 3
-        };
+      const additionalQuery = {
+        jsonrpc: '2.0',
+        method: 'condenser_api.get_discussions_by_created',
+        params: [{ tag: 'help', limit: 20 }],
+        id: 3
+      };
 
-        const resp = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          body: JSON.stringify(additionalQuery),
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await resp.json();
-        let helpTagPosts: HivePost[] = [];
-        if (data && data.result) {
-          helpTagPosts = data.result.map((post: any) => ({
-            author: post.author,
-            permlink: post.permlink,
-            title: post.title,
-            created: post.created,
-            body: post.body.slice(0, 200) + "...",
-            category: post.category,
-            tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
-            payout: parseFloat(post.pending_payout_value.split(" ")[0]),
-            upvoted: false,
-            image_url: post.json_metadata ? (() => {
-              try {
-                const meta = JSON.parse(post.json_metadata);
-                if (meta.image && meta.image.length > 0) return meta.image[0];
-                if (meta.cover_image) return meta.cover_image;
-                return undefined;
-              } catch { return undefined; }
-            })() : undefined,
-            author_reputation: post.author_reputation
-              ? Math.round(post.author_reputation / 1000000000000)
-              : 0,
-          }));
-        }
-
-        const allPosts = [...charityPosts, ...helpTagPosts];
-        const uniquePosts = allPosts.filter(
-          (post, idx, arr) =>
-            arr.findIndex(
-              (p) => p.author === post.author && p.permlink === post.permlink
-            ) === idx
-        );
-
-        const filteredPosts = uniquePosts.filter(
-          (p) =>
-            !analyzedArticleUrls.includes(
-              `https://peakd.com/@${p.author}/${p.permlink}`
-            )
-        );
-        setPosts(filteredPosts);
-
-        const charyStatusMap: Record<string, boolean> = {};
-
-        for (const post of filteredPosts) {
-          const postId = `${post.author}/${post.permlink}`;
-          if (charyInComments[postId] !== undefined) {
-            charyStatusMap[postId] = charyInComments[postId];
-          } else {
-            charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
-          }
-        }
-        setCharyInComments(charyStatusMap);
-
-      } catch (err) {
-        console.error('Fehler beim Suchen nach Charity-Artikeln:', err);
-        setError('Fehler beim Laden der Charity-Beiträge');
-      } finally {
-        setLoading(false);
-        setFetchingPosts(false);
+      const resp = await fetch('https://api.hive.blog', {
+        method: 'POST',
+        body: JSON.stringify(additionalQuery),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await resp.json();
+      let helpTagPosts: HivePost[] = [];
+      if (data && data.result) {
+        helpTagPosts = data.result.map((post: any) => ({
+          author: post.author,
+          permlink: post.permlink,
+          title: post.title,
+          created: post.created,
+          body: post.body.slice(0, 200) + "...",
+          category: post.category,
+          tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+          payout: parseFloat(post.pending_payout_value.split(" ")[0]),
+          upvoted: false,
+          image_url: post.json_metadata ? (() => {
+            try {
+              const meta = JSON.parse(post.json_metadata);
+              if (meta.image && meta.image.length > 0) return meta.image[0];
+              if (meta.cover_image) return meta.cover_image;
+              return undefined;
+            } catch { return undefined; }
+          })() : undefined,
+          author_reputation: post.author_reputation
+            ? Math.round(post.author_reputation / 1000000000000)
+            : 0,
+        }));
       }
-    };
 
-    loadPosts();
+      const allPosts = [...charityPosts, ...helpTagPosts];
+      const uniquePosts = allPosts.filter(
+        (post, idx, arr) =>
+          arr.findIndex(
+            (p) => p.author === post.author && p.permlink === post.permlink
+          ) === idx
+      );
+
+      const filteredPosts = uniquePosts.filter(
+        (p) =>
+          !analyzedArticleUrls.includes(
+            `https://peakd.com/@${p.author}/${p.permlink}`
+          )
+      );
+      setPosts(filteredPosts);
+
+      const charyStatusMap: Record<string, boolean> = {};
+
+      for (const post of filteredPosts) {
+        const postId = `${post.author}/${post.permlink}`;
+        if (charyInComments[postId] !== undefined) {
+          charyStatusMap[postId] = charyInComments[postId];
+        } else {
+          charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
+        }
+      }
+      setCharyInComments(charyStatusMap);
+
+    } catch (err) {
+      console.error('Fehler beim Suchen nach Charity-Artikeln:', err);
+      setError('Fehler beim Laden der Charity-Beiträge');
+    } finally {
+      setLoading(false);
+      setFetchingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFilteredCharityPosts();
   }, []);
 
   const handleUpvote = (post: HivePost) => {
@@ -422,7 +424,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox checked={showChary && charyInComments[postId]} tabIndex={-1} readOnly id={`charycb_${postId}`} />
+                        <Checkbox checked={showChary && charyInComments[postId]} tabIndex={-1} id={`charycb_${postId}`} />
                         <label htmlFor={`charycb_${postId}`} className="text-xs select-none">!CHARY</label>
                       </div>
                     </CardHeader>
