@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThumbsUp, Calendar, User, Tag, ExternalLink, AlertTriangle, Loader2 } from 'lucide-react';
@@ -72,12 +72,15 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [analysisProgress, setAnalysisProgress] = useState<number>(0);
   const [charyInComments, setCharyInComments] = useState<Record<string, boolean>>({});
   const [fetchingPosts, setFetchingPosts] = useState<boolean>(false);
+  const [showHistory, setShowHistory] = useState(true);
   const { toast } = useToast();
+  const initialLoad = useRef(true);
 
   const fetchLatestCharityPosts = async () => {
     setFetchingPosts(true);
     setLoading(true);
     setError(null);
+    setShowHistory(false);
     try {
       const charityPosts = await fetchCharityPosts();
 
@@ -203,7 +206,10 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   };
 
   useEffect(() => {
-    fetchLatestCharityPosts();
+    if (initialLoad.current) {
+      fetchLatestCharityPosts();
+      initialLoad.current = false;
+    }
   }, []);
 
   const handleUpvote = (post: HivePost) => {
@@ -315,6 +321,44 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
     }
   };
 
+  const handleFindMore = () => {
+    fetchLatestCharityPosts();
+  };
+
+  useEffect(() => {
+    if (!showHistory) return;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error } = await supabase
+          .from('charity_analysis_results')
+          .select('*')
+          .order('analyzed_at', { ascending: false })
+          .limit(10);
+        if (error) throw error;
+        const postsFromHistory = (data ?? []).map((a: any) => ({
+          author: a.author_name,
+          permlink: a.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? "",
+          title: a.openai_response.split("\n")[0].slice(0, 80),
+          created: a.created_at,
+          body: "",
+          category: "",
+          tags: [],
+          payout: 0,
+          upvoted: false,
+          image_url: a.image_url,
+          author_reputation: a.author_reputation ?? 0,
+        }));
+        setPosts(postsFromHistory);
+      } catch (e) {
+        setError('Fehler beim Laden der letzten 10 Analysen.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [showHistory]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-10">
@@ -366,7 +410,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
           <div className="flex gap-2">
             <Button
-              onClick={fetchLatestCharityPosts}
+              onClick={handleFindMore}
               disabled={fetchingPosts}
               className="bg-hive hover:bg-hive-dark"
             >
@@ -465,7 +509,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                       </div>
                       {charyStatus ? (
                         <div className="ml-2">
-                          <Checkbox checked tabIndex={-1} id={`charycb_${postId}`} aria-label="!CHARY" />
+                          <span title="!CHARY" className="block text-hive text-lg font-bold">x</span>
                         </div>
                       ) : null}
                     </CardHeader>
