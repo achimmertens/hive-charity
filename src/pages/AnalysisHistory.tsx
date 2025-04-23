@@ -1,0 +1,157 @@
+
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { format } from 'date-fns';
+import { de } from 'date-fns/locale';
+import { Card } from "@/components/ui/card";
+import { AlertTriangle, ExternalLink } from 'lucide-react';
+
+const AnalysisHistory = () => {
+  const { data: analyses, isLoading, error } = useQuery({
+    queryKey: ['charityAnalyses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('charity_analysis_results')
+        .select('*')
+        .order('analyzed_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[70vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-hive"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container py-8">
+        <Card className="p-6">
+          <div className="flex items-center gap-2 text-red-500">
+            <AlertTriangle className="h-6 w-6" />
+            <p>Fehler beim Laden der Analysen: {error.message}</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!analyses || analyses.length === 0) {
+    return (
+      <div className="container py-8">
+        <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
+        <Card className="p-6">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertTriangle className="h-10 w-10 text-amber-500 mb-4" />
+            <h3 className="text-xl font-bold mb-2">Keine Daten vorhanden</h3>
+            <p>
+              Es wurden noch keine Artikel analysiert. Bitte kehren Sie zur Hauptseite zurück 
+              und klicken Sie auf "Artikel auf Charity Scannen", um Daten in dieser Tabelle zu sehen.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Autor</TableHead>
+                <TableHead>Reputation</TableHead>
+                <TableHead>Charity Score</TableHead>
+                <TableHead>Erstellt am</TableHead>
+                <TableHead>Analysiert am</TableHead>
+                <TableHead>OpenAI Analyse</TableHead>
+                <TableHead>Aktionen</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {analyses?.map((analysis) => (
+                <TableRow key={analysis.id}>
+                  <TableCell>
+                    <a 
+                      href={`https://peakd.com/@${analysis.author_name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-hive hover:underline flex items-center gap-1"
+                    >
+                      @{analysis.author_name}
+                    </a>
+                  </TableCell>
+                  <TableCell>
+                    {analysis.author_reputation !== null 
+                      ? analysis.author_reputation 
+                      : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    <span className={`font-medium ${
+                      analysis.charity_score >= 7 ? 'text-green-600' :
+                      analysis.charity_score >= 4 ? 'text-amber-600' :
+                      'text-red-600'
+                    }`}>
+                      {analysis.charity_score}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {analysis.created_at ? format(new Date(analysis.created_at), 'PPp', { locale: de }) : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    {format(new Date(analysis.analyzed_at), 'PPp', { locale: de })}
+                  </TableCell>
+                  <TableCell className="max-w-md">
+                    <div className="truncate">{analysis.openai_response}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col space-y-2">
+                      <a
+                        href={analysis.article_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-hive hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Artikel
+                      </a>
+                      
+                      {analysis.image_url && (
+                        <a
+                          href={analysis.image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-hive hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Bild
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export default AnalysisHistory;
