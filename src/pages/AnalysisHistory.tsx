@@ -2,21 +2,14 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Card } from "@/components/ui/card";
-import { AlertTriangle, ExternalLink } from 'lucide-react';
-import SortableTableHeader from "@/components/SortableTableHeader";
+import { AlertTriangle } from 'lucide-react';
+import AnalysisHistoryTable from "@/components/AnalysisHistoryTable";
 import { useCharyInComments } from "@/hooks/useCharyInComments";
 
+// Table columns to be shown and sorted
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
@@ -69,7 +62,6 @@ const AnalysisHistory = () => {
     }
   });
 
-  // Initialize sortedAnalyses first, before using it
   let sortedAnalyses = analyses ?? [];
   if (sortKey && sortedAnalyses.length > 0) {
     sortedAnalyses = [...sortedAnalyses].sort((a, b) =>
@@ -79,7 +71,6 @@ const AnalysisHistory = () => {
     );
   }
 
-  // Now we can use sortedAnalyses
   const charyMap = useCharyInComments(sortedAnalyses);
 
   const handleSort = (key: string) => {
@@ -135,99 +126,14 @@ const AnalysisHistory = () => {
       <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map(col =>
-                  <SortableTableHeader
-                    key={col.key}
-                    column={col.key}
-                    sortKey={sortKey}
-                    sortDirection={sortDirection}
-                    onSort={handleSort}
-                  >
-                    {col.label}
-                  </SortableTableHeader>
-                )}
-                <TableHead>!CHARY</TableHead>
-                <TableHead>Analysiert am</TableHead>
-                <TableHead>OpenAI Analyse</TableHead>
-                <TableHead>Aktionen</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedAnalyses?.map((analysis) => {
-                const urlMatch = analysis.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
-                const charyKey = urlMatch ? `${urlMatch[1]}/${urlMatch[2]}` : "";
-                return (
-                  <TableRow key={analysis.id}>
-                    <TableCell>
-                      <a 
-                        href={`https://peakd.com/@${analysis.author_name}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-hive hover:underline flex items-center gap-1"
-                      >
-                        @{analysis.author_name}
-                      </a>
-                    </TableCell>
-                    <TableCell>
-                      {analysis.author_reputation !== null 
-                        ? analysis.author_reputation 
-                        : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`font-medium ${
-                        analysis.charity_score >= 7 ? 'text-green-600' :
-                        analysis.charity_score >= 4 ? 'text-amber-600' :
-                        'text-red-600'
-                      }`}>
-                        {analysis.charity_score}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {analysis.created_at ? format(new Date(analysis.created_at), 'PPp', { locale: de }) : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {analysis.title}
-                    </TableCell>
-                    <TableCell>
-                      {charyKey && charyMap[charyKey] ? <span className="text-hive text-lg font-bold">x</span> : ""}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(analysis.analyzed_at), 'PPp', { locale: de })}
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      <div className="truncate">{analysis.openai_response}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col space-y-2">
-                        <a
-                          href={analysis.article_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-hive hover:underline flex items-center gap-1"
-                        >
-                          <ExternalLink className="h-3 w-3" /> Artikel
-                        </a>
-                        
-                        {analysis.image_url && (
-                          <a
-                            href={analysis.image_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-hive hover:underline flex items-center gap-1"
-                          >
-                            <ExternalLink className="h-3 w-3" /> Bild
-                          </a>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <AnalysisHistoryTable
+            columns={columns}
+            analyses={sortedAnalyses}
+            charyMap={charyMap}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
         </div>
       </Card>
     </div>
