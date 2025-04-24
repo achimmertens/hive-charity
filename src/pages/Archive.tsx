@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -42,22 +42,22 @@ function getTitleFromUrl(url: string, openai_response: string): string {
   return url.slice(0, 52);
 }
 
-const AnalysisHistory = () => {
+const Archive = () => {
   const [sortKey, setSortKey] = useState('analyzed_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
+  const [selectedForRestore, setSelectedForRestore] = useState<string[]>([]);
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
-  const [selectedForArchiving, setSelectedForArchiving] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Fetch analysis data
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['charityAnalyses'],
+    queryKey: ['archivedAnalyses'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('charity_analysis_results')
         .select('*')
-        .eq('archived', false)  // Only get non-archived entries
+        .eq('archived', true)  // Only get archived entries
         .order('analyzed_at', { ascending: false });
       
       if (error) throw error;
@@ -68,30 +68,18 @@ const AnalysisHistory = () => {
         title: getTitleFromUrl(a.article_url, a.openai_response)
       }));
       
+      // Update favorite map
+      const favorites: Record<string, boolean> = {};
+      analysesWithTitle.forEach(a => {
+        if (a.is_favorite) {
+          favorites[a.id] = true;
+        }
+      });
+      setFavoriteMap(favorites);
+      
       return analysesWithTitle;
     }
   });
-
-  // Fetch favorites and archived statuses
-  useEffect(() => {
-    const fetchFlags = async () => {
-      // We need to load the favorites and archive flags
-      const { data: favoritesData } = await supabase
-        .from('charity_analysis_results')
-        .select('id, is_favorite')
-        .eq('is_favorite', true);
-        
-      if (favoritesData) {
-        const newFavoriteMap: Record<string, boolean> = {};
-        favoritesData.forEach(item => {
-          newFavoriteMap[item.id] = true;
-        });
-        setFavoriteMap(newFavoriteMap);
-      }
-    };
-    
-    fetchFlags();
-  }, []);
 
   // Sort analyses
   const sortedAnalyses = [...analyses].sort((a, b) =>
@@ -146,17 +134,17 @@ const AnalysisHistory = () => {
     }));
     
     if (value) {
-      setSelectedForArchiving(prev => [...prev, analysisId]);
+      setSelectedForRestore(prev => [...prev, analysisId]);
     } else {
-      setSelectedForArchiving(prev => prev.filter(id => id !== analysisId));
+      setSelectedForRestore(prev => prev.filter(id => id !== analysisId));
     }
   };
 
-  const handleArchiveSelected = async () => {
-    if (selectedForArchiving.length === 0) {
+  const handleRestoreSelected = async () => {
+    if (selectedForRestore.length === 0) {
       toast({
         title: "Keine Artikel ausgewählt",
-        description: "Bitte wählen Sie mindestens einen Artikel zum Archivieren aus.",
+        description: "Bitte wählen Sie mindestens einen Artikel zum Wiederherstellen aus.",
         variant: "destructive"
       });
       return;
@@ -165,40 +153,29 @@ const AnalysisHistory = () => {
     try {
       const { error } = await supabase
         .from('charity_analysis_results')
-        .update({ archived: true })
-        .in('id', selectedForArchiving);
+        .update({ archived: false })
+        .in('id', selectedForRestore);
       
       if (error) throw error;
       
       toast({
-        title: "Archiviert",
-        description: `${selectedForArchiving.length} Artikel wurden archiviert.`,
+        title: "Wiederhergestellt",
+        description: `${selectedForRestore.length} Artikel wurden wiederhergestellt.`,
       });
       
       // Reset state and refresh data
-      setSelectedForArchiving([]);
+      setSelectedForRestore([]);
       setArchiveMap({});
       refetch();
       
     } catch (error) {
-      console.error('Error archiving articles:', error);
+      console.error('Error restoring articles:', error);
       toast({
         title: "Fehler",
-        description: "Fehler beim Archivieren der Artikel.",
+        description: "Fehler beim Wiederherstellen der Artikel.",
         variant: "destructive"
       });
     }
-  };
-
-  const handleToggleChary = async (analysisId: string, postId: string, value: boolean) => {
-    // This is just for UI update, actual functionality would require API integration
-    const newCharyMap = { ...charyMap };
-    newCharyMap[postId] = value;
-    
-    toast({
-      title: value ? "!CHARY markiert" : "!CHARY entfernt",
-      description: `Der Artikel wurde als ${value ? '!CHARY markiert' : '!CHARY entfernt'}.`,
-    });
   };
 
   if (isLoading) {
@@ -215,7 +192,7 @@ const AnalysisHistory = () => {
         <Card className="p-6">
           <div className="flex items-center gap-2 text-red-500">
             <AlertTriangle className="h-6 w-6" />
-            <p>Fehler beim Laden der Analysen: {error.message}</p>
+            <p>Fehler beim Laden des Archivs: {error.message}</p>
           </div>
         </Card>
       </div>
@@ -225,14 +202,14 @@ const AnalysisHistory = () => {
   if (!sortedAnalyses || sortedAnalyses.length === 0) {
     return (
       <div className="container py-8">
-        <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
+        <h1 className="text-3xl font-bold mb-6">Archiv</h1>
         <Card className="p-6">
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertTriangle className="h-10 w-10 text-amber-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">Keine Daten vorhanden</h3>
+            <h3 className="text-xl font-bold mb-2">Keine archivierten Artikel vorhanden</h3>
             <p>
-              Es wurden noch keine Artikel analysiert. Bitte kehren Sie zur Hauptseite zurück 
-              und klicken Sie auf "Artikel auf Charity Scannen", um Daten in dieser Tabelle zu sehen.
+              Es wurden noch keine Artikel archiviert. Bitte gehen Sie zur Analyse-Historie,
+              um Artikel zu archivieren.
             </p>
           </div>
         </Card>
@@ -242,14 +219,14 @@ const AnalysisHistory = () => {
 
   return (
     <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
+      <h1 className="text-3xl font-bold mb-6">Archiv</h1>
       <div className="flex justify-end mb-4">
-        {selectedForArchiving.length > 0 && (
+        {selectedForRestore.length > 0 && (
           <Button 
-            onClick={handleArchiveSelected} 
+            onClick={handleRestoreSelected} 
             className="bg-hive hover:bg-hive-dark"
           >
-            {selectedForArchiving.length} Artikel archivieren
+            {selectedForRestore.length} Artikel wiederherstellen
           </Button>
         )}
       </div>
@@ -264,10 +241,9 @@ const AnalysisHistory = () => {
             onSort={handleSort}
             onToggleFavorite={handleToggleFavorite}
             onToggleArchive={handleToggleArchive}
-            onToggleChary={handleToggleChary}
             favoriteMap={favoriteMap}
             archiveMap={archiveMap}
-            showArchiveButton={selectedForArchiving.length > 0}
+            showArchiveButton={selectedForRestore.length > 0}
           />
         </div>
       </Card>
@@ -275,4 +251,4 @@ const AnalysisHistory = () => {
   );
 };
 
-export default AnalysisHistory;
+export default Archive;

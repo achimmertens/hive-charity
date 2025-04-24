@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import AnalysisHistory from "./pages/AnalysisHistory";
+import Favorites from "./pages/Favorites";
+import Archive from "./pages/Archive";
 import NotFound from "./pages/NotFound";
 import Navigation from "./components/Navigation";
 
@@ -21,6 +23,8 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/analysis-history" element={<AnalysisHistory />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/archive" element={<Archive />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

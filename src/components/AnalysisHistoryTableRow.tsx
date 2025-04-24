@@ -4,6 +4,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { ExternalLink } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Analysis = {
   id: string;
@@ -21,9 +22,22 @@ type Analysis = {
 interface Props {
   analysis: Analysis;
   charyMark: boolean;
+  onToggleChary?: (value: boolean) => void;
+  onToggleFavorite?: (value: boolean) => void;
+  onToggleArchive?: (value: boolean) => void;
+  isFavorite: boolean;
+  isArchived: boolean;
 }
 
-const AnalysisHistoryTableRow: React.FC<Props> = ({ analysis, charyMark }) => {
+const AnalysisHistoryTableRow: React.FC<Props> = ({ 
+  analysis, 
+  charyMark, 
+  onToggleChary,
+  onToggleFavorite,
+  onToggleArchive,
+  isFavorite,
+  isArchived
+}) => {
   const urlMatch = analysis.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
   return (
     <TableRow key={analysis.id}>
@@ -60,7 +74,15 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({ analysis, charyMark }) => {
       </TableCell>
       <TableCell>{analysis.title}</TableCell>
       <TableCell>
-        {charyMark && <span className="text-hive text-lg font-bold">x</span>}
+        {onToggleChary ? (
+          <Checkbox 
+            checked={charyMark} 
+            onCheckedChange={onToggleChary} 
+            className="ml-1" 
+          />
+        ) : (
+          charyMark && <span className="text-hive text-lg font-bold">x</span>
+        )}
       </TableCell>
       <TableCell>
         {format(new Date(analysis.analyzed_at), "PPp", { locale: de })}
@@ -89,6 +111,24 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({ analysis, charyMark }) => {
             </a>
           )}
         </div>
+      </TableCell>
+      <TableCell>
+        {onToggleFavorite && (
+          <Checkbox 
+            checked={isFavorite} 
+            onCheckedChange={onToggleFavorite} 
+            className="ml-1" 
+          />
+        )}
+      </TableCell>
+      <TableCell>
+        {onToggleArchive && (
+          <Checkbox 
+            checked={isArchived} 
+            onCheckedChange={onToggleArchive} 
+            className="ml-1" 
+          />
+        )}
       </TableCell>
     </TableRow>
   );

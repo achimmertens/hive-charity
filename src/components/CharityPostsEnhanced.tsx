@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -195,6 +196,9 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
         charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
       }
       setCharyInComments(charyStatusMap);
+      
+      // Fetch existing analyses for these posts
+      await fetchAnalysesForPosts(sortedNewestPosts);
 
     } catch (err) {
       console.error('Fehler beim Suchen nach Charity-Artikeln:', err);
@@ -202,6 +206,48 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
     } finally {
       setLoading(false);
       setFetchingPosts(false);
+    }
+  };
+
+  const fetchAnalysesForPosts = async (postsToFetch: HivePost[]) => {
+    if (!postsToFetch.length) return;
+    
+    try {
+      const postUrls = postsToFetch.map(post => `https://peakd.com/@${post.author}/${post.permlink}`);
+      
+      const { data, error } = await supabase
+        .from('charity_analysis_results')
+        .select('*')
+        .in('article_url', postUrls);
+        
+      if (error) {
+        console.error('Error fetching analyses:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const newAnalyses = { ...analyses };
+        
+        data.forEach(analysis => {
+          const postIdx = postsToFetch.findIndex(post => 
+            analysis.article_url.includes(`@${post.author}/${post.permlink}`)
+          );
+          
+          if (postIdx >= 0) {
+            const post = postsToFetch[postIdx];
+            const postId = `${post.author}/${post.permlink}`;
+            
+            newAnalyses[postId] = {
+              charyScore: analysis.charity_score,
+              summary: analysis.openai_response
+            };
+          }
+        });
+        
+        setAnalyses(newAnalyses);
+      }
+    } catch (err) {
+      console.error('Error fetching analyses:', err);
     }
   };
 
@@ -351,6 +397,17 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           author_reputation: a.author_reputation ?? 0,
         }));
         setPosts(postsFromHistory);
+        
+        // Also update the analyses state for these posts from history
+        const newAnalyses: Record<string, CharityAnalysis | null> = {};
+        data.forEach((analysis: any) => {
+          const postId = `${analysis.author_name}/${analysis.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? ""}`;
+          newAnalyses[postId] = {
+            charyScore: analysis.charity_score,
+            summary: analysis.openai_response
+          };
+        });
+        setAnalyses(newAnalyses);
       } catch (e) {
         setError('Fehler beim Laden der letzten 10 Analysen.');
       } finally {
@@ -575,7 +632,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
               </Card>
               <CharityAnalysisDisplay 
                 analysis={analysis} 
-                loading={analysis === null}
+                loading={analysis === null && isAnalyzing}
               />
             </div>
           );

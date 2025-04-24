@@ -2,7 +2,6 @@
 import {
   NavigationMenu,
   NavigationMenuItem,
-  NavigationMenuLink,
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
 import { Link, useLocation } from "react-router-dom";
@@ -37,6 +36,30 @@ const Navigation = () => {
                 }`}
               >
                 Analyse-Historie
+              </Link>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link 
+                to="/favorites"
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  location.pathname === "/favorites" 
+                    ? "bg-hive text-white" 
+                    : "hover:bg-muted"
+                }`}
+              >
+                Favoriten
+              </Link>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link 
+                to="/archive"
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  location.pathname === "/archive" 
+                    ? "bg-hive text-white" 
+                    : "hover:bg-muted"
+                }`}
+              >
+                Archiv
               </Link>
             </NavigationMenuItem>
           </NavigationMenuList>

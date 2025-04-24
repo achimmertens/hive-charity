@@ -17,6 +17,12 @@ interface Props {
   sortKey: string;
   sortDirection: "asc" | "desc";
   onSort: (key: string) => void;
+  onToggleChary?: (analysisId: string, postId: string, value: boolean) => void;
+  onToggleFavorite?: (analysisId: string, value: boolean) => void;
+  onToggleArchive?: (analysisId: string, value: boolean) => void;
+  favoriteMap: Record<string, boolean>;
+  archiveMap: Record<string, boolean>;
+  showArchiveButton?: boolean;
 }
 
 const AnalysisHistoryTable: React.FC<Props> = ({
@@ -26,6 +32,12 @@ const AnalysisHistoryTable: React.FC<Props> = ({
   sortKey,
   sortDirection,
   onSort,
+  onToggleChary,
+  onToggleFavorite,
+  onToggleArchive,
+  favoriteMap,
+  archiveMap,
+  showArchiveButton = false,
 }) => {
   return (
     <Table>
@@ -46,6 +58,8 @@ const AnalysisHistoryTable: React.FC<Props> = ({
           <TableHead>Analysiert am</TableHead>
           <TableHead>OpenAI Analyse</TableHead>
           <TableHead>Aktionen</TableHead>
+          <TableHead>Favorit</TableHead>
+          <TableHead>Archiv</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -57,6 +71,14 @@ const AnalysisHistoryTable: React.FC<Props> = ({
               key={analysis.id}
               analysis={analysis}
               charyMark={!!(charyKey && charyMap[charyKey])}
+              onToggleChary={onToggleChary ? 
+                (value) => onToggleChary(analysis.id, charyKey, value) : undefined}
+              onToggleFavorite={onToggleFavorite ? 
+                (value) => onToggleFavorite(analysis.id, value) : undefined}
+              onToggleArchive={onToggleArchive ? 
+                (value) => onToggleArchive(analysis.id, value) : undefined}
+              isFavorite={!!favoriteMap[analysis.id]}
+              isArchived={!!archiveMap[analysis.id]}
             />
           );
         })}
