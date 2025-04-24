@@ -4,14 +4,24 @@ import {
   NavigationMenuItem,
   NavigationMenuList,
 } from "@/components/ui/navigation-menu";
+import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { HiveUser } from "@/services/hiveAuth";
 
 const Navigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    supabase.auth.signOut();
+    navigate('/');
+  };
 
   return (
     <div className="border-b">
-      <div className="container py-4">
+      <div className="container py-4 flex justify-between items-center">
         <NavigationMenu>
           <NavigationMenuList>
             <NavigationMenuItem>
@@ -64,6 +74,9 @@ const Navigation = () => {
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
+        <Button onClick={handleLogout} variant="outline">
+          Ausloggen
+        </Button>
       </div>
     </div>
   );

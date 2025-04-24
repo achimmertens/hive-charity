@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -57,18 +56,15 @@ const Favorites = () => {
         .eq('archived', false)
         .order('analyzed_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching favorites:', error);
+        throw error;
+      }
       
-      // Add pseudo title for sorting and update favorite map
-      const analysesWithTitle = (data ?? []).map(a => {
-        favoriteMap[a.id] = true;
-        return {
-          ...a,
-          title: getTitleFromUrl(a.article_url, a.openai_response)
-        };
-      });
-      
-      return analysesWithTitle;
+      return data?.map(a => ({
+        ...a,
+        title: getTitleFromUrl(a.article_url, a.openai_response)
+      })) ?? [];
     }
   });
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import AnalysisHistoryTable from "@/components/AnalysisHistoryTable";
 import { useCharyInComments } from "@/hooks/useCharyInComments";
 
-// Table columns to be shown and sorted
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
@@ -31,7 +29,6 @@ const ascendingComparator = (a: any, b: any, orderBy: string) => {
 };
 
 function getTitleFromUrl(url: string, openai_response: string): string {
-  // Tries to extract the title from the OpenAI summary or the URL
   if (openai_response && openai_response.length > 0) {
     const first = openai_response.split('\n')[0];
     if (first.length < 80) return first;
@@ -50,38 +47,27 @@ const Archive = () => {
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
-  // Fetch analysis data
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['archivedAnalyses'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('charity_analysis_results')
         .select('*')
-        .eq('archived', true)  // Only get archived entries
+        .eq('archived', true)
         .order('analyzed_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching archived items:', error);
+        throw error;
+      }
       
-      // Add pseudo title for sorting
-      const analysesWithTitle = (data ?? []).map(a => ({
+      return data?.map(a => ({
         ...a,
         title: getTitleFromUrl(a.article_url, a.openai_response)
-      }));
-      
-      // Update favorite map
-      const favorites: Record<string, boolean> = {};
-      analysesWithTitle.forEach(a => {
-        if (a.is_favorite) {
-          favorites[a.id] = true;
-        }
-      });
-      setFavoriteMap(favorites);
-      
-      return analysesWithTitle;
+      })) ?? [];
     }
   });
 
-  // Sort analyses
   const sortedAnalyses = [...analyses].sort((a, b) =>
     sortDirection === 'asc'
       ? ascendingComparator(a, b, sortKey)
@@ -163,7 +149,6 @@ const Archive = () => {
         description: `${selectedForRestore.length} Artikel wurden wiederhergestellt.`,
       });
       
-      // Reset state and refresh data
       setSelectedForRestore([]);
       setArchiveMap({});
       refetch();
