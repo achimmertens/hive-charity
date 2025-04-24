@@ -5,9 +5,10 @@ import CharityPostsEnhanced from './CharityPostsEnhanced';
 
 interface HiveWelcomeProps {
   user: HiveUser;
+  onLogout?: () => void; // Added onLogout as an optional prop
 }
 
-const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user }) => {
+const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user, onLogout }) => {
   return (
     <div className="w-full">
       <div className="max-w-4xl mx-auto text-center mb-8">
