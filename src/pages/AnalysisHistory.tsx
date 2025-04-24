@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -72,23 +73,26 @@ const AnalysisHistory = () => {
 
   // Fetch favorites and archived statuses
   useEffect(() => {
-    const fetchFlags = async () => {
-      // We need to load the favorites and archive flags
-      const { data: favoritesData, error } = await supabase
-        .from('charity_analysis_results')
-        .select('id, is_favorite')
-        .eq('is_favorite', true);
+    const fetchFavorites = async () => {
+      try {
+        const { data: favoritesData } = await supabase
+          .from('charity_analysis_results')
+          .select('id')
+          .eq('is_favorite', true);
         
-      if (favoritesData) {
-        const newFavoriteMap: Record<string, boolean> = {};
-        favoritesData.forEach(item => {
-          newFavoriteMap[item.id] = true;
-        });
-        setFavoriteMap(newFavoriteMap);
+        if (favoritesData) {
+          const newFavoriteMap: Record<string, boolean> = {};
+          favoritesData.forEach(item => {
+            newFavoriteMap[item.id] = true;
+          });
+          setFavoriteMap(newFavoriteMap);
+        }
+      } catch (error) {
+        console.error('Error fetching favorites:', error);
       }
     };
     
-    fetchFlags();
+    fetchFavorites();
   }, []);
 
   // Sort analyses
@@ -128,7 +132,7 @@ const AnalysisHistory = () => {
         description: `Der Artikel wurde ${value ? 'zu den Favoriten hinzugefügt' : 'aus den Favoriten entfernt'}.`,
       });
       
-      // Add a refetch call to update the data
+      // Refetch data to update the UI
       refetch();
     } catch (error) {
       console.error('Error updating favorite status:', error);

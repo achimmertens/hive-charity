@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -67,15 +68,36 @@ const Archive = () => {
     }
   });
 
+  // Set up favorite map
   useEffect(() => {
-    if (archiveMap && Object.keys(archiveMap).length === 0 && analyses.length > 0) {
+    const fetchFavorites = async () => {
+      const { data: favoritesData } = await supabase
+        .from('charity_analysis_results')
+        .select('id')
+        .eq('is_favorite', true);
+      
+      if (favoritesData) {
+        const newFavoriteMap: Record<string, boolean> = {};
+        favoritesData.forEach(item => {
+          newFavoriteMap[item.id] = true;
+        });
+        setFavoriteMap(newFavoriteMap);
+      }
+    };
+    
+    fetchFavorites();
+  }, []);
+  
+  // Set up archive map
+  useEffect(() => {
+    if (analyses.length > 0 && Object.keys(archiveMap).length === 0) {
       const newArchiveMap: Record<string, boolean> = {};
       analyses.forEach(item => {
         newArchiveMap[item.id] = true;
       });
       setArchiveMap(newArchiveMap);
     }
-  }, [analyses]);
+  }, [analyses, archiveMap]);
 
   const sortedAnalyses = [...analyses].sort((a, b) =>
     sortDirection === 'asc'
@@ -130,7 +152,7 @@ const Archive = () => {
       [analysisId]: value
     }));
     
-    if (value) {
+    if (!value) {
       setSelectedForRestore(prev => [...prev, analysisId]);
     } else {
       setSelectedForRestore(prev => prev.filter(id => id !== analysisId));

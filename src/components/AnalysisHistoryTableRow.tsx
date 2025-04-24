@@ -70,6 +70,7 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
           />
         )}
       </TableCell>
+      <TableCell>{analysis.charity_score}</TableCell>
       <TableCell>
         <a
           href={`https://peakd.com/@${analysis.author_name}`}
