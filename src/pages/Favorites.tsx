@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
-  { key: 'charity_score', label: 'Charity Score' },
   { key: 'created_at', label: 'Erstellt am' },
   { key: 'title', label: 'Artikel-Titel' },
 ];
@@ -44,7 +43,19 @@ const Favorites = () => {
   const [sortKey, setSortKey] = useState('analyzed_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
-  const favoriteMap: Record<string, boolean> = {};
+  const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
+  const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
+
+  // Effect to set favorites when data is loaded
+  useEffect(() => {
+    if (favoriteMap && Object.keys(favoriteMap).length === 0) {
+      const newFavoriteMap: Record<string, boolean> = {};
+      analyses.forEach(item => {
+        newFavoriteMap[item.id] = true;
+      });
+      setFavoriteMap(newFavoriteMap);
+    }
+  }, [analyses]);
 
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['favoriteAnalyses'],
@@ -111,6 +122,31 @@ const Favorites = () => {
     }
   };
 
+  const handleToggleArchive = async (analysisId: string, value: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ archived: value })
+        .eq('id', analysisId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: value ? "Archiviert" : "Aus Archiv entfernt",
+        description: `Der Artikel wurde ${value ? 'archiviert' : 'aus dem Archiv entfernt'}.`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Error updating archive status:', error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Aktualisieren des Archivstatus.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[70vh]">
@@ -163,8 +199,9 @@ const Favorites = () => {
             sortDirection={sortDirection}
             onSort={handleSort}
             onToggleFavorite={handleToggleFavorite}
+            onToggleArchive={handleToggleArchive}
             favoriteMap={favoriteMap}
-            archiveMap={{}}
+            archiveMap={archiveMap}
           />
         </div>
       </Card>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { useCharyInComments } from "@/hooks/useCharyInComments";
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
-  { key: 'charity_score', label: 'Charity Score' },
   { key: 'created_at', label: 'Erstellt am' },
   { key: 'title', label: 'Artikel-Titel' },
 ];
@@ -68,6 +67,16 @@ const Archive = () => {
     }
   });
 
+  useEffect(() => {
+    if (archiveMap && Object.keys(archiveMap).length === 0 && analyses.length > 0) {
+      const newArchiveMap: Record<string, boolean> = {};
+      analyses.forEach(item => {
+        newArchiveMap[item.id] = true;
+      });
+      setArchiveMap(newArchiveMap);
+    }
+  }, [analyses]);
+
   const sortedAnalyses = [...analyses].sort((a, b) =>
     sortDirection === 'asc'
       ? ascendingComparator(a, b, sortKey)
@@ -103,6 +112,8 @@ const Archive = () => {
         title: value ? "Als Favorit markiert" : "Aus Favoriten entfernt",
         description: `Der Artikel wurde ${value ? 'zu den Favoriten hinzugefügt' : 'aus den Favoriten entfernt'}.`,
       });
+
+      refetch();
     } catch (error) {
       console.error('Error updating favorite status:', error);
       toast({

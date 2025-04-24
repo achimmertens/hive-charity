@@ -43,9 +43,9 @@ const AnalysisHistoryTable: React.FC<Props> = ({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>!CHARY</TableHead>
           <TableHead>Favorit</TableHead>
           <TableHead>Archiv</TableHead>
-          <TableHead>!CHARY</TableHead>
           {columns.map((col) => (
             <SortableTableHeader
               key={col.key}
@@ -57,8 +57,6 @@ const AnalysisHistoryTable: React.FC<Props> = ({
               {col.label}
             </SortableTableHeader>
           ))}
-          <TableHead>Analysiert am</TableHead>
-          <TableHead>OpenAI Analyse</TableHead>
           <TableHead>Aktionen</TableHead>
         </TableRow>
       </TableHeader>

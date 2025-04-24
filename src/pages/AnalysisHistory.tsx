@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,6 @@ import { useCharyInComments } from "@/hooks/useCharyInComments";
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
-  { key: 'charity_score', label: 'Charity Score' },
   { key: 'created_at', label: 'Erstellt am' },
   { key: 'title', label: 'Artikel-Titel' },
 ];
@@ -129,6 +127,9 @@ const AnalysisHistory = () => {
         title: value ? "Als Favorit markiert" : "Aus Favoriten entfernt",
         description: `Der Artikel wurde ${value ? 'zu den Favoriten hinzugefügt' : 'aus den Favoriten entfernt'}.`,
       });
+      
+      // Add a refetch call to update the data
+      refetch();
     } catch (error) {
       console.error('Error updating favorite status:', error);
       toast({

@@ -42,6 +42,35 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
   return (
     <TableRow key={analysis.id}>
       <TableCell>
+        {onToggleChary ? (
+          <Checkbox 
+            checked={charyMark} 
+            onCheckedChange={onToggleChary} 
+            className="ml-1" 
+          />
+        ) : (
+          charyMark && <span className="text-hive text-lg font-bold">x</span>
+        )}
+      </TableCell>
+      <TableCell>
+        {onToggleFavorite && (
+          <Checkbox 
+            checked={isFavorite} 
+            onCheckedChange={onToggleFavorite} 
+            className="ml-1" 
+          />
+        )}
+      </TableCell>
+      <TableCell>
+        {onToggleArchive && (
+          <Checkbox 
+            checked={isArchived} 
+            onCheckedChange={onToggleArchive} 
+            className="ml-1" 
+          />
+        )}
+      </TableCell>
+      <TableCell>
         <a
           href={`https://peakd.com/@${analysis.author_name}`}
           target="_blank"
@@ -55,41 +84,11 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
         {analysis.author_reputation !== null ? analysis.author_reputation : "N/A"}
       </TableCell>
       <TableCell>
-        <span
-          className={`font-medium ${
-            analysis.charity_score >= 7
-              ? "text-green-600"
-              : analysis.charity_score >= 4
-              ? "text-amber-600"
-              : "text-red-600"
-          }`}
-        >
-          {analysis.charity_score}
-        </span>
-      </TableCell>
-      <TableCell>
         {analysis.created_at
           ? format(new Date(analysis.created_at), "PPp", { locale: de })
           : "N/A"}
       </TableCell>
       <TableCell>{analysis.title}</TableCell>
-      <TableCell>
-        {onToggleChary ? (
-          <Checkbox 
-            checked={charyMark} 
-            onCheckedChange={onToggleChary} 
-            className="ml-1" 
-          />
-        ) : (
-          charyMark && <span className="text-hive text-lg font-bold">x</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {format(new Date(analysis.analyzed_at), "PPp", { locale: de })}
-      </TableCell>
-      <TableCell className="max-w-md">
-        <div className="truncate">{analysis.openai_response}</div>
-      </TableCell>
       <TableCell>
         <div className="flex flex-col space-y-2">
           <a
@@ -111,24 +110,6 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
             </a>
           )}
         </div>
-      </TableCell>
-      <TableCell>
-        {onToggleFavorite && (
-          <Checkbox 
-            checked={isFavorite} 
-            onCheckedChange={onToggleFavorite} 
-            className="ml-1" 
-          />
-        )}
-      </TableCell>
-      <TableCell>
-        {onToggleArchive && (
-          <Checkbox 
-            checked={isArchived} 
-            onCheckedChange={onToggleArchive} 
-            className="ml-1" 
-          />
-        )}
       </TableCell>
     </TableRow>
   );
