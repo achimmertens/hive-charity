@@ -76,7 +76,7 @@ const AnalysisHistory = () => {
   useEffect(() => {
     const fetchFlags = async () => {
       // We need to load the favorites and archive flags
-      const { data: favoritesData } = await supabase
+      const { data: favoritesData, error } = await supabase
         .from('charity_analysis_results')
         .select('id, is_favorite')
         .eq('is_favorite', true);

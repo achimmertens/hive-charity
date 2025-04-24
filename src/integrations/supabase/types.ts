@@ -48,6 +48,7 @@ export type Database = {
       charity_analysis_results: {
         Row: {
           analyzed_at: string
+          archived: boolean
           article_url: string
           author_name: string
           author_reputation: number | null
@@ -55,10 +56,12 @@ export type Database = {
           created_at: string
           id: string
           image_url: string | null
+          is_favorite: boolean
           openai_response: string
         }
         Insert: {
           analyzed_at?: string
+          archived?: boolean
           article_url: string
           author_name: string
           author_reputation?: number | null
@@ -66,10 +69,12 @@ export type Database = {
           created_at: string
           id?: string
           image_url?: string | null
+          is_favorite?: boolean
           openai_response: string
         }
         Update: {
           analyzed_at?: string
+          archived?: boolean
           article_url?: string
           author_name?: string
           author_reputation?: number | null
@@ -77,6 +82,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_url?: string | null
+          is_favorite?: boolean
           openai_response?: string
         }
         Relationships: []
