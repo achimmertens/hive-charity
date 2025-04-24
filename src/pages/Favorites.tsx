@@ -46,17 +46,6 @@ const Favorites = () => {
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
 
-  // Effect to set favorites when data is loaded
-  useEffect(() => {
-    if (favoriteMap && Object.keys(favoriteMap).length === 0) {
-      const newFavoriteMap: Record<string, boolean> = {};
-      analyses.forEach(item => {
-        newFavoriteMap[item.id] = true;
-      });
-      setFavoriteMap(newFavoriteMap);
-    }
-  }, [analyses]);
-
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['favoriteAnalyses'],
     queryFn: async () => {
@@ -79,7 +68,16 @@ const Favorites = () => {
     }
   });
 
-  // Sort analyses
+  useEffect(() => {
+    if (analyses.length > 0 && Object.keys(favoriteMap).length === 0) {
+      const newFavoriteMap: Record<string, boolean> = {};
+      analyses.forEach(item => {
+        newFavoriteMap[item.id] = true;
+      });
+      setFavoriteMap(newFavoriteMap);
+    }
+  }, [analyses]);
+
   const sortedAnalyses = [...analyses].sort((a, b) =>
     sortDirection === 'asc'
       ? ascendingComparator(a, b, sortKey)
