@@ -47,6 +47,7 @@ const Favorites = () => {
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
 
+  // Fetch favorited analyses that are not archived
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['favoriteAnalyses'],
     queryFn: async () => {
@@ -69,8 +70,9 @@ const Favorites = () => {
     }
   });
 
+  // Initialize favoriteMap based on fetched analyses
   useEffect(() => {
-    if (analyses.length > 0 && Object.keys(favoriteMap).length === 0) {
+    if (analyses.length > 0) {
       const newFavoriteMap: Record<string, boolean> = {};
       analyses.forEach(item => {
         newFavoriteMap[item.id] = true;

@@ -47,6 +47,7 @@ const Archive = () => {
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
+  // Explicitly fetch only archived items
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['archivedAnalyses'],
     queryFn: async () => {
@@ -71,24 +72,28 @@ const Archive = () => {
   // Set up favorite map
   useEffect(() => {
     const fetchFavorites = async () => {
-      const { data: favoritesData } = await supabase
-        .from('charity_analysis_results')
-        .select('id')
-        .eq('is_favorite', true);
-      
-      if (favoritesData) {
-        const newFavoriteMap: Record<string, boolean> = {};
-        favoritesData.forEach(item => {
-          newFavoriteMap[item.id] = true;
-        });
-        setFavoriteMap(newFavoriteMap);
+      try {
+        const { data: favoritesData } = await supabase
+          .from('charity_analysis_results')
+          .select('id')
+          .eq('is_favorite', true);
+        
+        if (favoritesData) {
+          const newFavoriteMap: Record<string, boolean> = {};
+          favoritesData.forEach(item => {
+            newFavoriteMap[item.id] = true;
+          });
+          setFavoriteMap(newFavoriteMap);
+        }
+      } catch (error) {
+        console.error('Error fetching favorites:', error);
       }
     };
     
     fetchFavorites();
   }, []);
   
-  // Set up archive map
+  // Set up archive map - all items in this view are archived
   useEffect(() => {
     if (analyses.length > 0 && Object.keys(archiveMap).length === 0) {
       const newArchiveMap: Record<string, boolean> = {};

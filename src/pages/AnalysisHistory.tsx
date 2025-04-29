@@ -49,7 +49,7 @@ const AnalysisHistory = () => {
   const [selectedForArchiving, setSelectedForArchiving] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // Fetch analysis data
+  // Fetch analysis data - explicitly fetch only non-archived items
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['charityAnalyses'],
     queryFn: async () => {
@@ -71,7 +71,7 @@ const AnalysisHistory = () => {
     }
   });
 
-  // Fetch favorites and archived statuses
+  // Fetch favorites statuses
   useEffect(() => {
     const fetchFavorites = async () => {
       try {

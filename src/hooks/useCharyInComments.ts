@@ -20,6 +20,13 @@ export function useCharyInComments(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(request),
         });
+        
+        // If there's a CORS error or any other issue, we just return false
+        if (!res.ok) {
+          console.warn(`Failed to fetch chary comments for ${author}/${permlink}: ${res.status}`);
+          return false;
+        }
+        
         const raw = await res.json();
         if (!raw.result || !raw.result.replies) return false;
         return raw.result.replies.some(
@@ -27,7 +34,8 @@ export function useCharyInComments(
             typeof reply.body === "string" &&
             reply.body.toLowerCase().includes("!chary")
         );
-      } catch {
+      } catch (error) {
+        console.warn(`Error fetching chary comments: ${error}`);
         return false;
       }
     }
@@ -40,7 +48,12 @@ export function useCharyInComments(
         const [, author, permlink] = urlMatch;
         const key = `${author}/${permlink}`;
         if (!(key in map)) {
-          map[key] = await fetchCharyComment(author, permlink);
+          try {
+            map[key] = await fetchCharyComment(author, permlink);
+          } catch (error) {
+            console.error(`Failed to check chary comment for ${key}:`, error);
+            map[key] = false; // Default to false on error
+          }
         }
       }
       setCharyMap(map);
