@@ -84,17 +84,17 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
 
     // Execute all queries in parallel
     const [tagResponse, communityResponse, searchResponse] = await Promise.all([
-      fetch('https://api.hive.blog', {
+      fetch('/api/hive', {
         method: 'POST',
         body: JSON.stringify(tagQuery),
         headers: { 'Content-Type': 'application/json' }
       }),
-      fetch('https://api.hive.blog', {
+      fetch('/api/hive', {
         method: 'POST',
         body: JSON.stringify(communityQuery),
         headers: { 'Content-Type': 'application/json' }
       }),
-      fetch('https://api.hive.blog', {
+      fetch('/api/hive', {
         method: 'POST',
         body: JSON.stringify(searchQuery),
         headers: { 'Content-Type': 'application/json' }

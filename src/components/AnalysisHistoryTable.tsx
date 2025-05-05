@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Table,
@@ -22,7 +21,6 @@ interface Props {
   onToggleArchive?: (analysisId: string, value: boolean) => void;
   favoriteMap: Record<string, boolean>;
   archiveMap: Record<string, boolean>;
-  showArchiveButton?: boolean;
 }
 
 const AnalysisHistoryTable: React.FC<Props> = ({
@@ -37,7 +35,6 @@ const AnalysisHistoryTable: React.FC<Props> = ({
   onToggleArchive,
   favoriteMap,
   archiveMap,
-  showArchiveButton = false,
 }) => {
   return (
     <Table>

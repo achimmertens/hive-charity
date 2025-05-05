@@ -1,4 +1,3 @@
-
 import React from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { format } from "date-fns";
@@ -38,7 +37,6 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
   isFavorite,
   isArchived
 }) => {
-  const urlMatch = analysis.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
   return (
     <TableRow key={analysis.id}>
       <TableCell>

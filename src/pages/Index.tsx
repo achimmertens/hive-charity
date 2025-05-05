@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import HiveLogin from '@/components/HiveLogin';
 import HiveWelcome from '@/components/HiveWelcome';
 import { HiveUser, processHiveSignerCallback } from '@/services/hiveAuth';
@@ -112,14 +111,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-100">
-      <header className="py-6 bg-white shadow-sm">
-        <div className="container">
-          <div className="flex justify-center">
-            <h1 className="text-3xl font-bold text-hive">Hive Charity Explorer</h1>
-          </div>
-        </div>
-      </header>
-      
       <main className="flex-1 container py-12">
         <div className="w-full">
           {user && user.loggedIn ? (
