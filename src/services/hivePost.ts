@@ -82,19 +82,19 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       id: 3
     };
 
-    // Execute all queries in parallel
+    // Execute all queries in parallel - use direct API calls instead of proxy
     const [tagResponse, communityResponse, searchResponse] = await Promise.all([
-      fetch('/api/hive', {
+      fetch('https://api.hive.blog', {
         method: 'POST',
         body: JSON.stringify(tagQuery),
         headers: { 'Content-Type': 'application/json' }
       }),
-      fetch('/api/hive', {
+      fetch('https://api.hive.blog', {
         method: 'POST',
         body: JSON.stringify(communityQuery),
         headers: { 'Content-Type': 'application/json' }
       }),
-      fetch('/api/hive', {
+      fetch('https://api.hive.blog', {
         method: 'POST',
         body: JSON.stringify(searchQuery),
         headers: { 'Content-Type': 'application/json' }
