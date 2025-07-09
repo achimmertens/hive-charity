@@ -8,6 +8,14 @@ import { AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import AnalysisHistoryTable from "@/components/AnalysisHistoryTable";
 import { useCharyInComments } from "@/hooks/useCharyInComments";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
 
 // Table columns to be shown and sorted
 const columns = [
@@ -47,17 +55,24 @@ const AnalysisHistory = () => {
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
   const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
   const [selectedForArchiving, setSelectedForArchiving] = useState<string[]>([]);
+  const [selectedForFavorites, setSelectedForFavorites] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
   const { toast } = useToast();
 
-  // Fetch analysis data - explicitly fetch only non-archived items
-  const { data: analyses = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['charityAnalyses'],
+  // Fetch analysis data with pagination
+  const { data: analysisData, isLoading, error, refetch } = useQuery({
+    queryKey: ['charityAnalyses', currentPage, sortKey, sortDirection],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize - 1;
+
+      const { data, error, count } = await supabase
         .from('charity_analysis_results')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('archived', false)  // Only get non-archived entries
-        .order('analyzed_at', { ascending: false });
+        .order(sortKey, { ascending: sortDirection === 'asc' })
+        .range(startIndex, endIndex);
       
       if (error) throw error;
       
@@ -67,9 +82,16 @@ const AnalysisHistory = () => {
         title: getTitleFromUrl(a.article_url, a.openai_response)
       }));
       
-      return analysesWithTitle;
+      return {
+        analyses: analysesWithTitle,
+        totalCount: count || 0
+      };
     }
   });
+
+  const analyses = analysisData?.analyses || [];
+  const totalCount = analysisData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   // Fetch favorites statuses
   useEffect(() => {
@@ -95,14 +117,7 @@ const AnalysisHistory = () => {
     fetchFavorites();
   }, []);
 
-  // Sort analyses
-  const sortedAnalyses = [...analyses].sort((a, b) =>
-    sortDirection === 'asc'
-      ? ascendingComparator(a, b, sortKey)
-      : descendingComparator(a, b, sortKey)
-  );
-
-  const charyMap = useCharyInComments(sortedAnalyses);
+  const charyMap = useCharyInComments(analyses);
 
   const handleSort = (key: string) => {
     if (key === sortKey) {
@@ -111,36 +126,19 @@ const AnalysisHistory = () => {
       setSortKey(key);
       setSortDirection('desc');
     }
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const handleToggleFavorite = async (analysisId: string, value: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('charity_analysis_results')
-        .update({ is_favorite: value })
-        .eq('id', analysisId);
-      
-      if (error) throw error;
-      
-      setFavoriteMap(prev => ({
-        ...prev,
-        [analysisId]: value
-      }));
-      
-      toast({
-        title: value ? "Als Favorit markiert" : "Aus Favoriten entfernt",
-        description: `Der Artikel wurde ${value ? 'zu den Favoriten hinzugefügt' : 'aus den Favoriten entfernt'}.`,
-      });
-      
-      // Refetch data to update the UI
-      refetch();
-    } catch (error) {
-      console.error('Error updating favorite status:', error);
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Aktualisieren des Favoritenstatus.",
-        variant: "destructive"
-      });
+    setFavoriteMap(prev => ({
+      ...prev,
+      [analysisId]: value
+    }));
+    
+    if (value) {
+      setSelectedForFavorites(prev => [...prev, analysisId]);
+    } else {
+      setSelectedForFavorites(prev => prev.filter(id => id !== analysisId));
     }
   };
 
@@ -195,6 +193,44 @@ const AnalysisHistory = () => {
     }
   };
 
+  const handleFavoritesSelected = async () => {
+    if (selectedForFavorites.length === 0) {
+      toast({
+        title: "Keine Artikel ausgewählt",
+        description: "Bitte wählen Sie mindestens einen Artikel für Favoriten aus.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ is_favorite: true })
+        .in('id', selectedForFavorites);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Zu Favoriten hinzugefügt",
+        description: `${selectedForFavorites.length} Artikel wurden zu Favoriten hinzugefügt.`,
+      });
+      
+      // Reset state and refresh data
+      setSelectedForFavorites([]);
+      setFavoriteMap({});
+      refetch();
+      
+    } catch (error) {
+      console.error('Error adding to favorites:', error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Hinzufügen zu Favoriten.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleToggleChary = async (analysisId: string, postId: string, value: boolean) => {
     // This is just for UI update, actual functionality would require API integration
     const newCharyMap = { ...charyMap };
@@ -227,7 +263,7 @@ const AnalysisHistory = () => {
     );
   }
 
-  if (!sortedAnalyses || sortedAnalyses.length === 0) {
+  if (!analyses || analyses.length === 0) {
     return (
       <div className="container py-8">
         <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
@@ -248,21 +284,35 @@ const AnalysisHistory = () => {
   return (
     <div className="container py-8">
       <h1 className="text-3xl font-bold mb-6">Charity-Analysen Historie</h1>
-      <div className="flex justify-end mb-4">
-        {selectedForArchiving.length > 0 && (
-          <Button 
-            onClick={handleArchiveSelected} 
-            className="bg-hive hover:bg-hive-dark"
-          >
-            {selectedForArchiving.length} Artikel archivieren
-          </Button>
-        )}
+      <div className="flex justify-between items-center mb-4">
+        <div className="text-sm text-gray-600">
+          Seite {currentPage} von {totalPages} ({totalCount} Artikel insgesamt)
+        </div>
+        <div className="flex gap-2">
+          {selectedForFavorites.length > 0 && (
+            <Button 
+              onClick={handleFavoritesSelected} 
+              variant="outline"
+              className="border-hive text-hive hover:bg-hive hover:text-white"
+            >
+              {selectedForFavorites.length} Favoriten hinzufügen
+            </Button>
+          )}
+          {selectedForArchiving.length > 0 && (
+            <Button 
+              onClick={handleArchiveSelected} 
+              className="bg-hive hover:bg-hive-dark"
+            >
+              {selectedForArchiving.length} Artikel archivieren
+            </Button>
+          )}
+        </div>
       </div>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <AnalysisHistoryTable
             columns={columns}
-            analyses={sortedAnalyses}
+            analyses={analyses}
             charyMap={charyMap}
             sortKey={sortKey}
             sortDirection={sortDirection}
@@ -276,6 +326,45 @@ const AnalysisHistory = () => {
           />
         </div>
       </Card>
+      
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              
+              {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                if (pageNum > totalPages) return null;
+                
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink 
+                      onClick={() => setCurrentPage(pageNum)}
+                      isActive={pageNum === currentPage}
+                      className="cursor-pointer"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 };

@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   server: {
+    port: 8080,
     proxy: {
       '/api/hive': {
         target: 'https://api.hive.blog',
