@@ -289,23 +289,21 @@ const AnalysisHistory = () => {
           Seite {currentPage} von {totalPages} ({totalCount} Artikel insgesamt)
         </div>
         <div className="flex gap-2">
-          {selectedForFavorites.length > 0 && (
-            <Button 
-              onClick={handleFavoritesSelected} 
-              variant="outline"
-              className="border-hive text-hive hover:bg-hive hover:text-white"
-            >
-              {selectedForFavorites.length} Favoriten hinzufügen
-            </Button>
-          )}
-          {selectedForArchiving.length > 0 && (
-            <Button 
-              onClick={handleArchiveSelected} 
-              className="bg-hive hover:bg-hive-dark"
-            >
-              {selectedForArchiving.length} Artikel archivieren
-            </Button>
-          )}
+          <Button 
+            onClick={handleFavoritesSelected} 
+            variant="outline"
+            className="border-hive text-hive hover:bg-hive hover:text-white"
+            disabled={selectedForFavorites.length === 0}
+          >
+            {selectedForFavorites.length > 0 ? `${selectedForFavorites.length} ` : ''}Favoriten hinzufügen
+          </Button>
+          <Button 
+            onClick={handleArchiveSelected} 
+            className="bg-hive hover:bg-hive-dark"
+            disabled={selectedForArchiving.length === 0}
+          >
+            {selectedForArchiving.length > 0 ? `${selectedForArchiving.length} ` : ''}Artikel archivieren
+          </Button>
         </div>
       </div>
       <Card className="overflow-hidden">
