@@ -13,24 +13,23 @@ serve(async (req) => {
   }
 
   try {
-    // Get the OpenAI API key
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    
-    if (!OPENAI_API_KEY) {
-      console.error('OpenAI API key not found in environment variables');
+    // Get the Gemini API key from environment (.env)
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      console.error('Gemini API key not found in environment variables');
       return new Response(
         JSON.stringify({
           error: true,
-          message: 'OpenAI API key is missing. Please set the OPENAI_API_KEY secret in Supabase.',
+          message: 'Gemini API key is missing. Please set the GEMINI_API_KEY secret in Supabase.',
           score: 0,
           summary: 'Die Analyse konnte nicht durchgeführt werden, da der API-Schlüssel fehlt.'
         }),
-        { 
-          status: 200, // Return 200 so client can handle this gracefully
-          headers: { 
+        {
+          status: 200,
+          headers: {
             ...corsHeaders,
-            'Content-Type': 'application/json' 
-          } 
+            'Content-Type': 'application/json'
+          }
         }
       );
     }
@@ -62,108 +61,102 @@ serve(async (req) => {
     console.log('Content length:', content.length);
 
     // Prepare the prompt for OpenAI
-    const prompt = `
-    Analyze this Hive blog post and determine how strongly it demonstrates charitable activities or intent.
-    
-    Title: ${title}
-    
-    Content: ${content.substring(0, 3000)}
-    
-    Please provide:
-    1. A CHARY Score from 0-10 where:
-       - 0-3: Minimal or no charitable activity
-       - 4-6: Some charitable intent or indirect support
-       - 7-10: Strong evidence of direct charitable activities
-       
-    2. A brief summary in German (2-3 sentences) explaining the charitable aspects of the post or lack thereof.
-    
-    Format your response as JSON with fields 'score' (number) and 'summary' (string).
-    `;
+    const prompt = `Analyze this Hive blog post and determine how strongly it demonstrates charitable activities or intent.\n\nTitle: ${title}\n\nContent: ${content.substring(0, 3000)}\n\nPlease provide:\n1. A CHARY Score from 0-10 where:\n   - 0-3: Minimal or no charitable activity\n   - 4-6: Some charitable intent or indirect support\n   - 7-10: Strong evidence of direct charitable activities\n\n2. A brief summary in German (2-3 sentences) explaining the charitable aspects of the post or lack thereof.\n\nFormat your response as JSON with fields 'score' (number) and 'summary' (string).`;
 
     try {
-      // Call OpenAI API
-      console.log('Sending request to OpenAI API...');
-      console.log('Using API key with first 5 chars:', OPENAI_API_KEY.substring(0, 5) + '...');
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Call Gemini API
+      console.log('Sending request to Gemini API...');
+      console.log('Using API key with first 5 chars:', GEMINI_API_KEY.substring(0, 5) + '...');
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+      const response = await fetch(geminiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.5,
+          contents: [{ parts: [{ text: prompt }] }]
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`OpenAI API error: ${response.status} ${errorText}`);
-        
+        console.error(`Gemini API error: ${response.status} ${errorText}`);
         return new Response(
           JSON.stringify({
             error: true,
-            message: `OpenAI API error: ${response.status}`,
+            message: `Gemini API error: ${response.status}`,
             score: 0,
             summary: 'Fehler bei der Verbindung zum Analyse-Dienst. Bitte versuchen Sie es später erneut.'
           }),
-          { 
-            status: 200, // Return 200 so client can handle this gracefully
-            headers: { 
+          {
+            status: 200,
+            headers: {
               ...corsHeaders,
-              'Content-Type': 'application/json' 
-            } 
+              'Content-Type': 'application/json'
+            }
           }
         );
       }
 
       const data = await response.json();
-      console.log('OpenAI API response received');
-      
-      const assistantMessage = data.choices[0].message.content;
-      console.log('Assistant message:', assistantMessage);
-      
+      console.log('Gemini API response received');
+
+      // Gemini response parsing
+      let answer = "";
+      try {
+        answer = data.candidates[0].content.parts[0].text;
+      } catch (e) {
+        console.error('Failed to parse Gemini response:', e);
+        return new Response(
+          JSON.stringify({
+            error: true,
+            message: 'Fehler beim Parsen der Gemini-Antwort.',
+            score: 0,
+            summary: 'Fehler beim Parsen der Gemini-Antwort.'
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
+
       let result;
       try {
-        // Try to parse the response as JSON
-        result = JSON.parse(assistantMessage);
-        console.log('Successfully parsed JSON response');
+        result = JSON.parse(answer);
+        console.log('Successfully parsed JSON response from Gemini');
       } catch (error) {
-        console.log('Failed to parse JSON response, extracting manually');
-        
+        console.log('Failed to parse JSON response from Gemini, extracting manually');
         // Extract the score (looking for a number from 0-10)
-        const scoreMatch = assistantMessage.match(/score['"]?\s*:\s*([0-9]|10)/i);
+        const scoreMatch = answer.match(/score['"]?\s*:\s*([0-9]|10)/i);
         const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
-        
         // Extract the summary (anything in quotes after "summary")
-        let summaryMatch = assistantMessage.match(/summary['"]?\s*:\s*['"]([^'"]+)['"]/i);
-        if (!summaryMatch) {
+        let summaryMatch = answer.match(/summary['"]?\s*:\s*['"]([^'"]+)['"]/i);
+        let summary = "";
+        if (summaryMatch && summaryMatch[1]) {
+          summary = summaryMatch[1];
+        } else {
           // Try to find any paragraph that might be the summary
-          const paragraphs = assistantMessage.split('\n').filter(p => p.trim().length > 0);
-          const summary = paragraphs.find(p => p.trim().length > 20 && !p.includes('score'));
-          summaryMatch = summary ? [null, summary] : null;
+          const paragraphs = answer.split('\n').filter(p => p.trim().length > 0);
+          const found = paragraphs.find(p => p.trim().length > 20 && !p.includes('score'));
+          summary = found || "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
         }
-        
-        const summary = summaryMatch 
-          ? summaryMatch[1] 
-          : "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
-        
         result = { score, summary };
-        console.log('Manually extracted result:', result);
+        console.log('Manually extracted result from Gemini:', result);
       }
-      
+
       // Validate that we have a score and summary
       if (!result.score && result.score !== 0) {
         result.score = 0;
       }
-      
       if (!result.summary) {
         result.summary = "Keine klare Analyse verfügbar.";
       }
-      
-      console.log('Final analysis result:', result);
+      console.log('Final analysis result from Gemini:', result);
 
       // Return the final result
       return new Response(
@@ -171,11 +164,11 @@ serve(async (req) => {
           score: result.score,
           summary: result.summary
         }),
-        { 
-          headers: { 
+        {
+          headers: {
             ...corsHeaders,
-            'Content-Type': 'application/json' 
-          } 
+            'Content-Type': 'application/json'
+          }
         }
       );
       
