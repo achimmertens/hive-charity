@@ -1,4 +1,3 @@
-
 import { HivePost } from "@/services/hivePost";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -54,7 +53,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         openai_response: data.summary,
         image_url: post.image_url,
         author_reputation: post.author_reputation,
-        analyzed_at: new Date().toISOString()
+        analyzed_at: new Date().toISOString(),
+        archived: false // ensure new analyses are not archived
       };
 
       console.log('Saving to database:', analysisData);
