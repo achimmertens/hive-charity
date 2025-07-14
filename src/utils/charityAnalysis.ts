@@ -43,8 +43,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       }
       
       console.log('Analysis result:', data);
-
       // Store the analysis result in the database
+      // Always upsert (insert or update) so every scanned article appears in the history
       const analysisData = {
         article_url: `https://peakd.com/@${post.author}/${post.permlink}`,
         author_name: post.author,
@@ -57,16 +57,16 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         archived: false // ensure new analyses are not archived
       };
 
-      console.log('Saving to database:', analysisData);
-
-      const { error: insertError } = await supabase
+      console.log('Saving to database (upsert):', analysisData);
+      // Use upsert to ensure every scanned article appears only once, updated if re-scanned
+      const { error: upsertError } = await supabase
         .from('charity_analysis_results')
-        .insert(analysisData);
+        .upsert([analysisData], { onConflict: 'article_url' });
 
-      if (insertError) {
-        console.error('Error storing analysis result:', insertError);
+      if (upsertError) {
+        console.error('Error storing analysis result:', upsertError);
       } else {
-        console.log('Successfully saved to database');
+        console.log('Successfully saved to database (upsert)');
       }
       
       return {

@@ -105,7 +105,12 @@ serve(async (req) => {
       // Gemini response parsing
       let answer = "";
       try {
-        answer = data.candidates[0].content.parts[0].text;
+        // Robust: candidates kann fehlen oder leer sein
+        if (data && data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+          answer = data.candidates[0].content.parts[0].text;
+        } else {
+          throw new Error("Gemini response missing candidates or content");
+        }
       } catch (e) {
         console.error('Failed to parse Gemini response:', e);
         return new Response(

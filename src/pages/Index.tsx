@@ -6,6 +6,73 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
+  // State for manual CharityCheck
+  const [manualUrl, setManualUrl] = useState("");
+  const [manualLoading, setManualLoading] = useState(false);
+
+  // Helper: fetch Hive post by URL
+  async function fetchHivePostByUrl(url: string) {
+    // Example: https://peakd.com/@author/permlink
+    const match = url.match(/@([^/]+)\/([^/?#]+)/);
+    if (!match) return null;
+    const author = match[1];
+    const permlink = match[2];
+    // Use Hive API
+    const resp = await fetch("https://api.hive.blog", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "condenser_api.get_content",
+        params: [author, permlink],
+        id: 1
+      })
+    });
+    const data = await resp.json();
+    if (!data || !data.result || !data.result.author) return null;
+    return data.result;
+  }
+
+  // CharityCheck handler
+  const handleManualCharityCheck = async () => {
+    if (!manualUrl.trim()) {
+      toast({ title: "Bitte eine Hive-Post-URL eingeben." });
+      return;
+    }
+    setManualLoading(true);
+    try {
+      const post = await fetchHivePostByUrl(manualUrl.trim());
+      if (!post) {
+        toast({ title: "Kein Hive-Post gefunden.", description: "Bitte überprüfe die URL." });
+        setManualLoading(false);
+        return;
+      }
+      // Prepare HivePost object for analyzeCharityPost
+      const hivePost = {
+        author: post.author,
+        permlink: post.permlink,
+        title: post.title,
+        body: post.body,
+        created: post.created,
+        category: post.category,
+        tags: post.json_metadata ? (JSON.parse(post.json_metadata).tags || []) : [],
+        payout: parseFloat(post.pending_payout_value?.split(" ")[0] || "0"),
+        upvoted: false,
+        image_url: post.json_metadata ? (() => { try { const meta = JSON.parse(post.json_metadata); if (meta.image && meta.image.length > 0) return meta.image[0]; if (meta.cover_image) return meta.cover_image; return undefined; } catch { return undefined; } })() : undefined,
+        author_reputation: post.author_reputation ? Math.round(post.author_reputation / 1000000000000) : 0,
+      };
+      // Import analyzeCharityPost dynamically
+      const { analyzeCharityPost } = await import("@/utils/charityAnalysis");
+      const result = await analyzeCharityPost(hivePost);
+      toast({
+        title: "CharityCheck abgeschlossen",
+        description: `Score: ${result.charyScore}/10 - ${result.summary}`,
+      });
+    } catch (err) {
+      toast({ title: "Fehler bei CharityCheck", description: String(err), variant: "destructive" });
+    }
+    setManualLoading(false);
+  };
   const [user, setUser] = useState<HiveUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -112,6 +179,27 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-100">
       <main className="flex-1 container py-12">
+        {/* CharityCheck Input */}
+        <div className="w-full max-w-xl mx-auto mb-8 flex flex-col items-center gap-4">
+          <div className="w-full flex gap-2">
+            <input
+              type="text"
+              className="border rounded px-3 py-2 w-full"
+              placeholder="Hive-Post-URL eingeben (z.B. https://peakd.com/@autor/permlink)"
+              value={manualUrl}
+              onChange={e => setManualUrl(e.target.value)}
+              disabled={manualLoading}
+            />
+            <button
+              className={`bg-hive text-white px-4 py-2 rounded font-bold ${manualLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={handleManualCharityCheck}
+              disabled={manualLoading}
+            >
+              CharityCheck
+            </button>
+          </div>
+          <div className="text-xs text-gray-500 w-full">Gib eine Hive-Post-URL ein und prüfe den Charity-Score des Autors. Das Ergebnis erscheint in der Historie.</div>
+        </div>
         <div className="w-full">
           {user && user.loggedIn ? (
             <HiveWelcome user={user} onLogout={handleLogout} />
@@ -130,7 +218,6 @@ const Index = () => {
           )}
         </div>
       </main>
-      
       <footer className="py-6 bg-gray-50 border-t border-gray-200">
         <div className="container">
           <p className="text-center text-gray-500 text-sm">

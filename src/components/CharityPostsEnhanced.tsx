@@ -1,406 +1,72 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ThumbsUp, Calendar, User, Tag, ExternalLink, AlertTriangle, Loader2 } from 'lucide-react';
-import { fetchCharityPosts, upvotePost, HivePost } from '@/services/hivePost';
-import { HiveUser } from '@/services/hiveAuth';
-import { useToast } from "@/hooks/use-toast";
+import { Calendar, User, Tag, ExternalLink, AlertTriangle } from 'lucide-react';
+import { HivePost } from '@/services/hivePost';
+// ...existing code...
+// ...existing code...
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { analyzeCharityPost, CharityAnalysis } from '@/utils/charityAnalysis';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
-import { Progress } from "@/components/ui/progress";
+// ...existing code...
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CharityPostsProps {
-  user: HiveUser;
+  // ...existing code...
 }
 
-const fetchAnalyzedArticleUrls = async (): Promise<string[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('charity_analysis_results')
-      .select('article_url');
-    if (error) {
-      console.warn("Error fetching analysis history:", error);
-      return [];
-    }
-    return (data ?? []).map((entry: any) => entry.article_url);
-  } catch (err) {
-    console.error("DB lookup error:", err);
-    return [];
-  }
-};
-
-const fetchCharyInComments = async (author: string, permlink: string): Promise<boolean> => {
-  try {
-    const request = {
-      jsonrpc: "2.0",
-      method: "bridge.get_discussion",
-      params: { author, permlink },
-      id: 123
-    };
-    const res = await fetch("https://api.hive.blog", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
-    const raw = await res.json();
-    if (!raw.result || !raw.result.replies) return false;
-
-    return raw.result.replies.some(
-      (reply: any) =>
-        typeof reply.body === "string" &&
-        reply.body.toLowerCase().includes("!chary")
-    );
-  } catch (e) {
-    console.error("Failed checking !CHARY in comments for", author, permlink, e);
-    return false;
-  }
-};
 
 const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [posts, setPosts] = useState<HivePost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [votingInProgress, setVotingInProgress] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
-  const [analyzingPosts, setAnalyzingPosts] = useState<boolean>(false);
-  const [currentlyAnalyzing, setCurrentlyAnalyzing] = useState<string | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState<number>(0);
-  const [charyInComments, setCharyInComments] = useState<Record<string, boolean>>({});
-  const [fetchingPosts, setFetchingPosts] = useState<boolean>(false);
-  const [showHistory, setShowHistory] = useState(true);
-  const { toast } = useToast();
-  const initialLoad = useRef(true);
 
-  const fetchLatestCharityPosts = async () => {
-    setFetchingPosts(true);
+  // Historien-Logik: Zeige die letzten 10 gescannten Artikel aus der Datenbank
+  useEffect(() => {
     setLoading(true);
     setError(null);
-    setShowHistory(false);
-    try {
-      const charityPosts = await fetchCharityPosts();
-
-      const additionalQuery = {
-        jsonrpc: '2.0',
-        method: 'condenser_api.get_discussions_by_created',
-        params: [{ tag: 'help', limit: 20 }],
-        id: 3
-      };
-
-      const resp = await fetch('https://api.hive.blog', {
-        method: 'POST',
-        body: JSON.stringify(additionalQuery),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await resp.json();
-      let helpTagPosts: HivePost[] = [];
-      if (data && data.result) {
-        helpTagPosts = data.result.map((post: any) => ({
-          author: post.author,
-          permlink: post.permlink,
-          title: post.title,
-          created: post.created,
-          body: post.body.slice(0, 200) + "...",
-          category: post.category,
-          tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
-          payout: parseFloat(post.pending_payout_value.split(" ")[0]),
-          upvoted: false,
-          image_url: post.json_metadata ? (() => {
-            try {
-              const meta = JSON.parse(post.json_metadata);
-              if (meta.image && meta.image.length > 0) return meta.image[0];
-              if (meta.cover_image) return meta.cover_image;
-              return undefined;
-            } catch { return undefined; }
-          })() : undefined,
-          author_reputation: post.author_reputation
-            ? Math.round(post.author_reputation / 1000000000000)
-            : 0,
-        }));
-      }
-
-      const searchForCharyCommentPosts = async (): Promise<HivePost[]> => {
-        const searchPostsQuery = {
-          jsonrpc: '2.0',
-          method: 'condenser_api.get_discussions_by_trending',
-          params: [{ tag: '', limit: 20 }],
-          id: 100
-        };
-        const searchResp = await fetch('https://api.hive.blog', {
-          method: 'POST',
-          body: JSON.stringify(searchPostsQuery),
-          headers: { 'Content-Type': 'application/json' }
-        });
-        const searchData = await searchResp.json();
-        let result: HivePost[] = [];
-        if (searchData && searchData.result) {
-          for (const post of searchData.result) {
-            const hasChary = await fetchCharyInComments(post.author, post.permlink);
-            if (hasChary) {
-              result.push({
-                author: post.author,
-                permlink: post.permlink,
-                title: post.title,
-                created: post.created,
-                body: post.body.slice(0, 200) + "...",
-                category: post.category,
-                tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
-                payout: parseFloat(post.pending_payout_value.split(" ")[0]),
-                upvoted: false,
-                image_url: post.json_metadata ? (() => {
-                  try {
-                    const meta = JSON.parse(post.json_metadata);
-                    if (meta.image && meta.image.length > 0) return meta.image[0];
-                    if (meta.cover_image) return meta.cover_image;
-                    return undefined;
-                  } catch { return undefined; }
-                })() : undefined,
-                author_reputation: post.author_reputation
-                  ? Math.round(post.author_reputation / 1000000000000)
-                  : 0,
-              });
-              if (result.length >= 10) break;
-            }
-          }
+    supabase
+      .from('charity_analysis_results')
+      .select('*')
+      .order('analyzed_at', { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (error) {
+          setError('Fehler beim Laden der letzten 10 Analysen.');
+          setLoading(false);
+          return;
         }
-        return result;
-      };
-
-      const charyPosts = await searchForCharyCommentPosts();
-
-      const allPosts = [
-        ...charityPosts,
-        ...helpTagPosts,
-        ...charyPosts
-      ];
-      const uniquePosts = allPosts.filter(
-        (post, idx, arr) =>
-          arr.findIndex(
-            (p) => p.author === post.author && p.permlink === post.permlink
-          ) === idx
-      );
-
-      const sortedNewestPosts = uniquePosts
-        .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
-        .slice(0, 10);
-      setPosts(sortedNewestPosts);
-
-      const charyStatusMap: Record<string, boolean> = {};
-      for (const post of sortedNewestPosts) {
-        const postId = `${post.author}/${post.permlink}`;
-        charyStatusMap[postId] = await fetchCharyInComments(post.author, post.permlink);
-      }
-      setCharyInComments(charyStatusMap);
-      
-      // Fetch existing analyses for these posts
-      await fetchAnalysesForPosts(sortedNewestPosts);
-
-    } catch (err) {
-      console.error('Fehler beim Suchen nach Charity-Artikeln:', err);
-      setError('Fehler beim Laden der Charity-Beiträge');
-    } finally {
-      setLoading(false);
-      setFetchingPosts(false);
-    }
-  };
-
-  const fetchAnalysesForPosts = async (postsToFetch: HivePost[]) => {
-    if (!postsToFetch.length) return;
-    
-    try {
-      const postUrls = postsToFetch.map(post => `https://peakd.com/@${post.author}/${post.permlink}`);
-      
-      const { data, error } = await supabase
-        .from('charity_analysis_results')
-        .select('*')
-        .in('article_url', postUrls);
-        
-      if (error) {
-        console.error('Error fetching analyses:', error);
-        return;
-      }
-      
-      if (data && data.length > 0) {
-        const newAnalyses = { ...analyses };
-        
-        data.forEach(analysis => {
-          const postIdx = postsToFetch.findIndex(post => 
-            analysis.article_url.includes(`@${post.author}/${post.permlink}`)
-          );
-          
-          if (postIdx >= 0) {
-            const post = postsToFetch[postIdx];
-            const postId = `${post.author}/${post.permlink}`;
-            
-            newAnalyses[postId] = {
-              charyScore: analysis.charity_score,
-              summary: analysis.openai_response
-            };
-          }
+        const postsFromHistory = (data ?? []).map((a: any) => {
+          let tags: string[] = [];
+          try {
+            if (a.tags) tags = a.tags;
+            else if (a.openai_response && a.openai_response.match(/#\w+/g)) tags = a.openai_response.match(/#\w+/g) || [];
+          } catch {}
+          return {
+            author: a.author_name,
+            permlink: a.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? "",
+            title: a.title || a.openai_response.split("\n")[0].slice(0, 80),
+            created: a.created_at,
+            body: a.body || a.openai_response || "",
+            category: a.category || "",
+            tags,
+            payout: a.payout || 0,
+            upvoted: false,
+            image_url: a.image_url,
+            author_reputation: a.author_reputation ?? 0,
+            community: a.community || "",
+            community_title: a.community_title || ""
+          };
         });
-        
-        setAnalyses(newAnalyses);
-      }
-    } catch (err) {
-      console.error('Error fetching analyses:', err);
-    }
-  };
-
-  useEffect(() => {
-    if (initialLoad.current) {
-      fetchLatestCharityPosts();
-      initialLoad.current = false;
-    }
-  }, []);
-
-  const handleUpvote = (post: HivePost) => {
-    const postId = `${post.author}/${post.permlink}`;
-    setVotingInProgress(postId);
-
-    upvotePost(user, post.author, post.permlink, 100, (success, message) => {
-      setVotingInProgress(null);
-      
-      if (success) {
-        setPosts(posts.map(p => 
-          p.author === post.author && p.permlink === post.permlink
-            ? { ...p, upvoted: true }
-            : p
-        ));
-        
-        toast({
-          title: "Upvote erfolgreich",
-          description: message,
-        });
-      } else {
-        toast({
-          title: "Upvote fehlgeschlagen",
-          description: message,
-          variant: "destructive",
-        });
-      }
-    });
-  };
-
-  const analyzePost = async (post: HivePost) => {
-    const postId = `${post.author}/${post.permlink}`;
-    setAnalyses(prev => ({ ...prev, [postId]: null }));
-    
-    try {
-      console.log(`Starting analysis for post: ${postId}`);
-      const analysis = await analyzeCharityPost(post);
-      console.log(`Analysis complete for post ${postId}:`, analysis);
-      
-      setAnalyses(prev => ({ 
-        ...prev, 
-        [postId]: analysis 
-      }));
-      
-      return true;
-    } catch (error) {
-      console.error(`Error analyzing post ${postId}:`, error);
-      setAnalyses(prev => ({ 
-        ...prev, 
-        [postId]: {
-          charyScore: 0,
-          summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
-        }
-      }));
-      
-      return false;
-    }
-  };
-
-  const analyzeAllPosts = async () => {
-    if (analyzingPosts) return;
-    
-    setAnalyzingPosts(true);
-    setAnalysisProgress(0);
-    
-    const initialAnalyses: Record<string, CharityAnalysis | null> = {};
-    posts.forEach(post => {
-      const postId = `${post.author}/${post.permlink}`;
-      initialAnalyses[postId] = null;
-    });
-    setAnalyses(initialAnalyses);
-    
-    const totalPosts = posts.length;
-    let successCount = 0;
-    let failCount = 0;
-    
-    try {
-      for (let i = 0; i < posts.length; i++) {
-        const post = posts[i];
-        const postId = `${post.author}/${post.permlink}`;
-        setCurrentlyAnalyzing(postId);
-        
-        const success = await analyzePost(post);
-        if (success) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-        
-        const progress = Math.round(((i + 1) / totalPosts) * 100);
-        setAnalysisProgress(progress);
-      }
-      
-      toast({
-        title: "Analyse abgeschlossen",
-        description: `${successCount} Artikel wurden erfolgreich analysiert. ${failCount} Fehler.`,
-      });
-    } catch (error) {
-      console.error('Error during post analysis:', error);
-      toast({
-        title: "Analyse fehlgeschlagen",
-        description: "Es gab ein Problem bei der Analyse der Beiträge.",
-        variant: "destructive",
-      });
-    } finally {
-      setAnalyzingPosts(false);
-      setCurrentlyAnalyzing(null);
-      setAnalysisProgress(100);
-    }
-  };
-
-  const handleFindMore = () => {
-    fetchLatestCharityPosts();
-  };
-
-  useEffect(() => {
-    if (!showHistory) return;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase
-          .from('charity_analysis_results')
-          .select('*')
-          .order('analyzed_at', { ascending: false })
-          .limit(10);
-        if (error) throw error;
-        const postsFromHistory = (data ?? []).map((a: any) => ({
-          author: a.author_name,
-          permlink: a.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? "",
-          title: a.openai_response.split("\n")[0].slice(0, 80),
-          created: a.created_at,
-          body: "",
-          category: "",
-          tags: [],
-          payout: 0,
-          upvoted: false,
-          image_url: a.image_url,
-          author_reputation: a.author_reputation ?? 0,
-        }));
         setPosts(postsFromHistory);
-        
-        // Also update the analyses state for these posts from history
+        // Update analyses state
         const newAnalyses: Record<string, CharityAnalysis | null> = {};
-        data.forEach((analysis: any) => {
+        (data ?? []).forEach((analysis: any) => {
           const postId = `${analysis.author_name}/${analysis.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? ""}`;
           newAnalyses[postId] = {
             charyScore: analysis.charity_score,
@@ -408,13 +74,11 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           };
         });
         setAnalyses(newAnalyses);
-      } catch (e) {
-        setError('Fehler beim Laden der letzten 10 Analysen.');
-      } finally {
         setLoading(false);
-      }
-    })();
-  }, [showHistory]);
+      });
+  }, []);
+
+  // ...existing code...
 
   if (loading) {
     return (
@@ -463,58 +127,12 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   return (
     <div>
       <div className="flex flex-col mb-6 space-y-2">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
-          <div className="flex gap-2">
-            <Button
-              onClick={handleFindMore}
-              disabled={fetchingPosts}
-              className="bg-hive hover:bg-hive-dark"
-            >
-              {fetchingPosts ? (
-                <>
-                  <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                  </svg>
-                  Weitere Artikel suchen...
-                </>
-              ) : (
-                'Weitere Artikel suchen'
-              )}
-            </Button>
-            <Button 
-              onClick={analyzeAllPosts} 
-              disabled={analyzingPosts}
-              className="bg-hive hover:bg-hive-dark"
-            >
-              {analyzingPosts ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analysiere...
-                </>
-              ) : (
-                'Artikel auf Charity Scannen'
-              )}
-            </Button>
-          </div>
-        </div>
-        {analyzingPosts && (
-          <div className="w-full">
-            <div className="flex justify-between text-sm mb-1">
-              <span>Analyse läuft...</span>
-              <span>{analysisProgress}%</span>
-            </div>
-            <Progress value={analysisProgress} className="h-2" />
-          </div>
-        )}
+        <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
       </div>
       <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const postId = `${post.author}/${post.permlink}`;
-          const isAnalyzing = currentlyAnalyzing === postId;
           const analysis = analyses[postId];
-          const charyStatus = charyInComments[postId];
           return (
             <div key={postId} className="grid md:grid-cols-2 gap-4">
               <Card className="overflow-hidden transition-shadow hover:shadow-md">
@@ -532,7 +150,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                       />
                     </div>
                   ) : null}
-                  
                   <div className={`${post.image_url ? 'md:col-span-2' : 'md:col-span-3'} p-4`}>
                     <CardHeader className="p-0 pb-2 flex justify-between items-start">
                       <div>
@@ -564,15 +181,9 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                           </span>
                         </CardDescription>
                       </div>
-                      {charyStatus ? (
-                        <div className="ml-2">
-                          <span title="!CHARY" className="block text-hive text-lg font-bold">x</span>
-                        </div>
-                      ) : null}
                     </CardHeader>
                     <CardContent className="p-0 py-4">
                       <p className="text-gray-600 line-clamp-3 mb-4">{post.body}</p>
-                      
                       <div className="flex flex-wrap gap-2 mb-4">
                         {post.tags && post.tags.slice(0, 5).map(tag => (
                           <Badge key={tag} variant="secondary" className="flex items-center">
@@ -580,7 +191,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                             {tag}
                           </Badge>
                         ))}
-                        
                         {post.community && (
                           <Badge variant="outline" className="border-hive text-hive">
                             {post.community_title || post.community}
@@ -601,30 +211,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                         >
                           <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
                         </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleUpvote(post)}
-                          disabled={post.upvoted || votingInProgress !== null}
-                          className={post.upvoted ? "bg-green-500 hover:bg-green-600" : "bg-hive hover:bg-hive-dark"}
-                        >
-                          {votingInProgress === `${post.author}/${post.permlink}` ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              Abstimmen...
-                            </>
-                          ) : post.upvoted ? (
-                            <>
-                              <ThumbsUp className="h-4 w-4 mr-1" />
-                              Abgestimmt
-                            </>
-                          ) : (
-                            <>
-                              <ThumbsUp className="h-4 w-4 mr-1" />
-                              Upvoten
-                            </>
-                          )}
-                        </Button>
                       </div>
                     </CardFooter>
                   </div>
@@ -632,7 +218,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
               </Card>
               <CharityAnalysisDisplay 
                 analysis={analysis} 
-                loading={analysis === null && isAnalyzing}
+                loading={analysis === null}
               />
             </div>
           );
