@@ -25,13 +25,33 @@ const CharityPosts: React.FC<CharityPostsProps> = ({ user }) => {
       try {
         const charityPosts = await fetchCharityPosts();
         setPosts(charityPosts);
-        
+
         // Initialize upvote weights to 100% (1.0) for all posts
         const initialWeights: Record<string, number> = {};
         charityPosts.forEach(post => {
           initialWeights[`${post.author}/${post.permlink}`] = 1.0;
         });
         setUpvoteWeights(initialWeights);
+
+        // Import analyzeCharityPost dynamically
+        const { analyzeCharityPost } = await import("@/utils/charityAnalysis");
+        // Check which posts are already in the history table
+        const { data: existingAnalyses, error: historyError } = await import("@/integrations/supabase/client").then(({ supabase }) =>
+          supabase.from('charity_analysis_results').select('article_url')
+        );
+        const existingUrls = (existingAnalyses ?? []).map((a: any) => a.article_url);
+
+        // Analyze and upsert all posts not already in the history
+        for (const post of charityPosts) {
+          const url = `https://peakd.com/@${post.author}/${post.permlink}`;
+          if (!existingUrls.includes(url)) {
+            try {
+              await analyzeCharityPost(post);
+            } catch (err) {
+              console.error('Fehler bei der automatischen Analyse:', err);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading posts:', error);
         toast({
