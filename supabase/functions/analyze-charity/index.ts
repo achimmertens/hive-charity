@@ -61,7 +61,32 @@ serve(async (req) => {
     console.log('Content length:', content.length);
 
     // Prepare the prompt for OpenAI
-    const prompt = `Analyze this Hive blog post and determine how strongly it demonstrates charitable activities or intent.\n\nTitle: ${title}\n\nContent: ${content.substring(0, 3000)}\n\nPlease provide:\n1. A CHARY Score from 0-10 where:\n   - 0-3: Minimal or no charitable activity\n   - 4-6: Some charitable intent or indirect support\n   - 7-10: Strong evidence of direct charitable activities\n\n2. A brief summary in German (2-3 sentences) explaining the charitable aspects of the post or lack thereof.\n\nFormat your response as JSON with fields 'score' (number) and 'summary' (string).`;
+    // Load the strict prompt and examples from environment variable
+    // Load the prompt and examples from charityExamples.txt at runtime
+    let charityPrompt = '';
+    try {
+      // Use absolute path for Supabase Edge Functions (function root)
+      charityPrompt = await Deno.readTextFile('./src/charityexamples.txt');
+    } catch (err) {
+      console.error('Could not read charityExamples.txt:', err);
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: 'Could not read charityExamples.txt. Please ensure the file exists and is accessible.',
+          score: 0,
+          summary: 'Die Analyse konnte nicht durchgeführt werden, da die Prompt-Datei fehlt.'
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+    // Compose the full prompt for Gemini
+    const prompt = `${charityPrompt}\n\n---\nNow analyze the following Hive blog post according to the instructions and examples above.\nTitle: ${title}\nContent: ${content.substring(0, 3000)}\n\nReturn your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
 
     try {
       // Call Gemini API
