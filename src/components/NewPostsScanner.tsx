@@ -17,6 +17,27 @@ const NewPostsScanner: React.FC = () => {
   const [posts, setPosts] = useState<HivePost[]>([]);
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
   const [ranOnce, setRanOnce] = useState(false);
+  const maxShown = 20;
+
+  // Load persisted entries on mount
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('currentCharityPostsV1');
+      if (raw) {
+        const parsed = JSON.parse(raw) as { post: HivePost; analysis: CharityAnalysis }[];
+        const restoredPosts = parsed.map(p => p.post).slice(0, maxShown);
+        const restoredAnalyses: Record<string, CharityAnalysis | null> = {};
+        parsed.slice(0, maxShown).forEach(p => {
+          restoredAnalyses[`${p.post.author}/${p.post.permlink}`] = p.analysis;
+        });
+        setPosts(restoredPosts);
+        setAnalyses(restoredAnalyses);
+        setRanOnce(true);
+      }
+    } catch (e) {
+      console.warn('Failed to restore current posts', e);
+    }
+  }, []);
 
   const handleScan = async () => {
     if (loading) return;
@@ -24,20 +45,23 @@ const NewPostsScanner: React.FC = () => {
     setRanOnce(true);
     try {
       const candidates = await fetchCharityPosts();
-      if (!candidates || candidates.length === 0) {
+      // Filter out posts containing Chinese characters in title or body
+      const cjkRegex = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+      const candidatesFiltered = (candidates || []).filter(p => !cjkRegex.test(p.title) && !cjkRegex.test(p.body));
+      if (!candidatesFiltered || candidatesFiltered.length === 0) {
         toast({ title: "Keine Beiträge gefunden", description: "Es konnten aktuell keine neuen Beiträge geladen werden." });
         setLoading(false);
         return;
       }
 
-      const urls = candidates.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
+      const urls = candidatesFiltered.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
       const { data: existing } = await supabase
         .from('charity_analysis_results')
         .select('article_url')
         .in('article_url', urls);
 
       const existingUrls = new Set((existing ?? []).map(r => r.article_url as string));
-      const newOnes = candidates.filter(p => !existingUrls.has(`https://peakd.com/@${p.author}/${p.permlink}`)).slice(0, 10);
+      const newOnes = candidatesFiltered.filter(p => !existingUrls.has(`https://peakd.com/@${p.author}/${p.permlink}`)).slice(0, 10);
 
       if (newOnes.length === 0) {
         toast({ title: "Keine neuen Beiträge", description: "Alle gefundenen Beiträge wurden bereits angezeigt." });
@@ -51,22 +75,35 @@ const NewPostsScanner: React.FC = () => {
       // set loading placeholders
       const initial: Record<string, CharityAnalysis | null> = {};
       newOnes.forEach(p => { initial[`${p.author}/${p.permlink}`] = null; });
-      setAnalyses(initial);
+      setAnalyses(prev => ({ ...prev, ...initial }));
 
       // Analyze in parallel
       const results = await Promise.all(newOnes.map(async (post) => {
         try {
           const res = await analyzeCharityPost(post);
-          return { key: `${post.author}/${post.permlink}`, res } as const;
+          return { key: `${post.author}/${post.permlink}`, post, res } as const;
         } catch (e) {
           console.error('Analyse fehlgeschlagen', e);
-          return { key: `${post.author}/${post.permlink}`, res: { charyScore: 0, summary: 'Analyse fehlgeschlagen.' } } as const;
+          return { key: `${post.author}/${post.permlink}`, post, res: { charyScore: 0, summary: 'Analyse fehlgeschlagen.' } } as const;
         }
       }));
 
-      const finalAnalyses: Record<string, CharityAnalysis | null> = {};
+      const finalAnalyses: Record<string, CharityAnalysis | null> = { ...analyses };
       results.forEach(r => { finalAnalyses[r.key] = r.res; });
+
+      // Persist and limit to maxShown, newest first
+      const existingRaw = localStorage.getItem('currentCharityPostsV1');
+      const existingList: { post: HivePost; analysis: CharityAnalysis }[] = existingRaw ? JSON.parse(existingRaw) : [];
+      const combined = [...results.map(r => ({ post: r.post, analysis: r.res })), ...existingList];
+      const dedupMap = new Map<string, { post: HivePost; analysis: CharityAnalysis }>();
+      for (const item of combined) {
+        dedupMap.set(`${item.post.author}/${item.post.permlink}`, item);
+      }
+      const persisted = Array.from(dedupMap.values()).slice(0, maxShown);
+      localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
+
       setAnalyses(finalAnalyses);
+      setPosts(persisted.map(p => p.post));
 
       toast({ title: `${newOnes.length} neue Beiträge analysiert`, description: "Die Ergebnisse wurden auch in der Historie gespeichert." });
     } catch (error) {

@@ -65,14 +65,14 @@ serve(async (req) => {
     // Load the prompt and examples from charityExamples.txt at runtime
     let charityPrompt = '';
     try {
-      // Use absolute path for Supabase Edge Functions (function root)
-      charityPrompt = await Deno.readTextFile('./src/charityexamples.txt');
+      // Read prompt and examples from function directory
+      charityPrompt = await Deno.readTextFile('./charityExamples.txt');
     } catch (err) {
       console.error('Could not read charityExamples.txt:', err);
       return new Response(
         JSON.stringify({
           error: true,
-          message: 'Could not read charityExamples.txt. Please ensure the file exists and is accessible.',
+          message: 'Could not read charityExamples.txt. Please ensure the file exists in the function folder.',
           score: 0,
           summary: 'Die Analyse konnte nicht durchgeführt werden, da die Prompt-Datei fehlt.'
         }),
@@ -203,12 +203,12 @@ serve(async (req) => {
       );
       
     } catch (error) {
-      console.error('OpenAI API request error:', error);
+      console.error('Gemini API request error:', error);
       
       return new Response(
         JSON.stringify({
           error: true,
-          message: `Error calling OpenAI API: ${error.message}`,
+          message: `Error calling Gemini API: ${error.message}`,
           score: 0,
           summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
         }),

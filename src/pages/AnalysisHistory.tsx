@@ -70,20 +70,26 @@ const AnalysisHistory = () => {
       const { data, error, count } = await supabase
         .from('charity_analysis_results')
         .select('*', { count: 'exact' })
-        .eq('archived', false)  // Only get non-archived entries
         .order(sortKey, { ascending: sortDirection === 'asc' })
         .range(startIndex, endIndex);
       
       if (error) throw error;
       
-      // Add pseudo title for sorting
       const analysesWithTitle = (data ?? []).map(a => ({
         ...a,
         title: getTitleFromUrl(a.article_url, a.openai_response)
       }));
+
+      // Filter out entries with Chinese characters in title or summary
+      const cjkRegex = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+      const filtered = analysesWithTitle.filter(a => {
+        const t = a.title || '';
+        const s = a.openai_response || '';
+        return !cjkRegex.test(t) && !cjkRegex.test(s);
+      });
       
       return {
-        analyses: analysesWithTitle,
+        analyses: filtered,
         totalCount: count || 0
       };
     }
