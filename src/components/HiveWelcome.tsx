@@ -2,6 +2,7 @@
 import React from 'react';
 import { HiveUser } from "@/services/hiveAuth";
 import CharityPostsEnhanced from './CharityPostsEnhanced';
+import NewPostsScanner from './NewPostsScanner';
 
 interface HiveWelcomeProps {
   user: HiveUser;
@@ -21,6 +22,8 @@ const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user, onLogout }) => {
       </div>
 
       <div className="max-w-4xl mx-auto">
+        {/* Neue Beiträge suchen Button und Ergebnisliste */}
+        <NewPostsScanner />
         <CharityPostsEnhanced user={user} />
       </div>
     </div>
