@@ -15,7 +15,11 @@ const Navigation = () => {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    supabase.auth.signOut();
+    try { supabase.auth.signOut(); } catch {}
+    try {
+      localStorage.removeItem('hiveUser');
+      localStorage.removeItem('hivesigner_login_pending');
+    } catch {}
     navigate('/');
   };
 

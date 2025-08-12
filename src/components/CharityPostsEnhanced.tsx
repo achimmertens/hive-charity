@@ -14,8 +14,13 @@ import { CharityAnalysisDisplay } from './CharityAnalysis';
 // ...existing code...
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { postComment } from "@/services/hiveComment";
+import { HiveUser } from "@/services/hiveAuth";
 
 interface CharityPostsProps {
+  user: HiveUser;
   // ...existing code...
 }
 
@@ -25,6 +30,9 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
+  const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<Record<string, boolean>>({});
 
   // Historien-Logik: Zeige die letzten 10 gescannten Artikel aus der Datenbank
   useEffect(() => {
@@ -202,16 +210,28 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                       <div className="flex items-center text-sm text-gray-500">
                         <span className="font-semibold text-green-600">${post.payout.toFixed(2)}</span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`https://peakd.com/@${post.author}/${post.permlink}`, '_blank')}
-                          className="text-gray-600 flex items-center"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
-                        </Button>
-                      </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`https://peakd.com/@${post.author}/${post.permlink}`, '_blank')}
+                            className="text-gray-600 flex items-center"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const prefill = analysis
+                                ? `Charity-Score: ${analysis.charyScore}/10\n\nKI-Antwort:\n${analysis.summary}\n\n`
+                                : '';
+                              setReplyOpen((prev) => ({ ...prev, [postId]: !prev[postId] }));
+                              if (!replyText[postId]) setReplyText((prev) => ({ ...prev, [postId]: prefill }));
+                            }}
+                          >
+                            Antworten
+                          </Button>
+                        </div>
                     </CardFooter>
                   </div>
                 </div>
@@ -220,6 +240,55 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                 analysis={analysis} 
                 loading={analysis === null}
               />
+              {replyOpen[postId] && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Antwort verfassen</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={replyText[postId] || ''}
+                      onChange={(e) => setReplyText((prev) => ({ ...prev, [postId]: e.target.value }))}
+                      rows={8}
+                      placeholder="Ihre Antwort..."
+                    />
+                  </CardContent>
+                  <CardFooter className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReplyOpen((prev) => ({ ...prev, [postId]: false }))}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={sending[postId] || !user?.loggedIn}
+                      onClick={() => {
+                        if (!user || !user.loggedIn) {
+                          toast('Bitte loggen Sie sich ein, um zu antworten.');
+                          return;
+                        }
+                        const body = replyText[postId] || '';
+                        if (body.trim().length === 0) {
+                          toast('Antwort darf nicht leer sein.');
+                          return;
+                        }
+                        setSending((prev) => ({ ...prev, [postId]: true }));
+                        postComment(user, post.author, post.permlink, body, (success, message) => {
+                          setSending((prev) => ({ ...prev, [postId]: false }));
+                          toast(message);
+                          if (success) {
+                            setReplyOpen((prev) => ({ ...prev, [postId]: false }));
+                          }
+                        });
+                      }}
+                    >
+                      {sending[postId] ? 'Senden...' : 'Senden'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )}
             </div>
           );
         })}
