@@ -156,13 +156,21 @@ const Index = () => {
     localStorage.setItem('hiveUser', JSON.stringify(loggedInUser));
   };
   
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('hiveUser');
-    toast({
-      title: "Abgemeldet",
-      description: "Sie wurden erfolgreich abgemeldet.",
-    });
+  const handleLogout = async () => {
+    if (user) {
+      // Import and use the logout function
+      const { logoutFromHive } = await import('@/services/hiveLogout');
+      await logoutFromHive(user);
+      
+      // Clear local state
+      setUser(null);
+      localStorage.removeItem('hiveUser');
+      
+      toast({
+        title: "Abgemeldet",
+        description: "Sie wurden erfolgreich abgemeldet.",
+      });
+    }
   };
 
   if (loading) {
