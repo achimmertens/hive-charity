@@ -6,22 +6,15 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { HiveUser } from "@/services/hiveAuth";
 
-const Navigation = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
+interface NavigationProps {
+  user?: HiveUser | null;
+  onLogout?: () => void;
+}
 
-  const handleLogout = () => {
-    try { supabase.auth.signOut(); } catch {}
-    try {
-      localStorage.removeItem('hiveUser');
-      localStorage.removeItem('hivesigner_login_pending');
-    } catch {}
-    navigate('/');
-  };
+const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
+  const location = useLocation();
 
   return (
     <div className="border-b">
@@ -78,9 +71,11 @@ const Navigation = () => {
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
-        <Button onClick={handleLogout} variant="outline">
-          Ausloggen
-        </Button>
+        {user?.loggedIn && onLogout && (
+          <Button onClick={onLogout} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+            Ausloggen
+          </Button>
+        )}
       </div>
     </div>
   );

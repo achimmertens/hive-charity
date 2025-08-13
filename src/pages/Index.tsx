@@ -5,7 +5,12 @@ import { HiveUser, processHiveSignerCallback } from '@/services/hiveAuth';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-const Index = () => {
+interface IndexProps {
+  user: HiveUser | null;
+  setUser: (user: HiveUser | null) => void;
+}
+
+const Index: React.FC<IndexProps> = ({ user, setUser }) => {
   // State for manual CharityCheck
   const [manualUrl, setManualUrl] = useState("");
   const [manualLoading, setManualLoading] = useState(false);
@@ -73,10 +78,9 @@ const Index = () => {
     }
     setManualLoading(false);
   };
-  const [user, setUser] = useState<HiveUser | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  
+
   // Record login to Supabase
   const recordLogin = async (username: string) => {
     try {
@@ -156,22 +160,7 @@ const Index = () => {
     localStorage.setItem('hiveUser', JSON.stringify(loggedInUser));
   };
   
-  const handleLogout = async () => {
-    if (user) {
-      // Import and use the logout function
-      const { logoutFromHive } = await import('@/services/hiveLogout');
-      await logoutFromHive(user);
-      
-      // Clear local state
-      setUser(null);
-      localStorage.removeItem('hiveUser');
-      
-      toast({
-        title: "Abgemeldet",
-        description: "Sie wurden erfolgreich abgemeldet.",
-      });
-    }
-  };
+
 
   if (loading) {
     return (
@@ -210,7 +199,7 @@ const Index = () => {
         </div>
         <div className="w-full">
           {user && user.loggedIn ? (
-            <HiveWelcome user={user} onLogout={handleLogout} />
+            <HiveWelcome user={user} />
           ) : (
             <>
               <div className="text-center mb-8 max-w-lg mx-auto">
