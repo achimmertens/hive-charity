@@ -36,7 +36,7 @@ const CharityPosts: React.FC<CharityPostsProps> = ({ user }) => {
         // Import analyzeCharityPost dynamically
         const { analyzeCharityPost } = await import("@/utils/charityAnalysis");
         // Check which posts are already in the history table
-        const { data: existingAnalyses, error: historyError } = await import("@/integrations/supabase/client").then(({ supabase }) =>
+        const { data: existingAnalyses } = await import("@/integrations/supabase/client").then(({ supabase }) =>
           supabase.from('charity_analysis_results').select('article_url')
         );
         const existingUrls = (existingAnalyses ?? []).map((a: any) => a.article_url);

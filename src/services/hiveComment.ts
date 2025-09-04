@@ -66,20 +66,3 @@ export function postComment(
   onResult(false, "Antworten über HiveAuth wird noch nicht unterstützt.");
 }
 
-// Extend global Window type for Keychain API
-declare global {
-  interface Window {
-    hive_keychain: {
-      requestPost: (
-        username: string,
-        title: string,
-        body: string,
-        parentPermlink: string,
-        parentAuthor: string,
-        permlink: string,
-        jsonMetadata: string,
-        callback: (response: any) => void
-      ) => void;
-    };
-  }
-}

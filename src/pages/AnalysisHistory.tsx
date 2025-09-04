@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,6 @@ const columns = [
   { key: 'title', label: 'Artikel-Titel' },
 ];
 
-const descendingComparator = (a: any, b: any, orderBy: string) => {
-  if (a[orderBy] < b[orderBy]) return 1;
-  if (a[orderBy] > b[orderBy]) return -1;
-  return 0;
-};
-
-const ascendingComparator = (a: any, b: any, orderBy: string) => {
-  if (a[orderBy] < b[orderBy]) return -1;
-  if (a[orderBy] > b[orderBy]) return 1;
-  return 0;
-};
 
 function getTitleFromUrl(url: string, openai_response: string): string {
   // Tries to extract the title from the OpenAI summary or the URL
@@ -237,7 +226,7 @@ const AnalysisHistory = () => {
     }
   };
 
-  const handleToggleChary = async (analysisId: string, postId: string, value: boolean) => {
+  const handleToggleChary = async (_analysisId: string, postId: string, value: boolean) => {
     // This is just for UI update, actual functionality would require API integration
     const newCharyMap = { ...charyMap };
     newCharyMap[postId] = value;
@@ -375,17 +364,3 @@ const AnalysisHistory = () => {
 
 export default AnalysisHistory;
 
-type Props = {
-  columns: { key: string; label: string }[];
-  analyses: any[];
-  charyMap: Record<string, boolean>;
-  sortKey: string;
-  sortDirection: 'asc' | 'desc';
-  onSort: (key: string) => void;
-  onToggleFavorite: (id: string, value: boolean) => void;
-  onToggleArchive: (id: string, value: boolean) => void;
-  onToggleChary: (analysisId: string, postId: string, value: boolean) => void;
-  favoriteMap: Record<string, boolean>;
-  archiveMap: Record<string, boolean>;
-  showArchiveButton: boolean;
-};

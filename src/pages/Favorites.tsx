@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -45,7 +45,7 @@ const Favorites = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
-  const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
+  const [archiveMap] = useState<Record<string, boolean>>({});
 
   // Fetch favorited analyses that are not archived
   const { data: analyses = [], isLoading, error, refetch } = useQuery({

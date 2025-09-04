@@ -9,10 +9,8 @@ import { HivePost } from '@/services/hivePost';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
-import { analyzeCharityPost, CharityAnalysis } from '@/utils/charityAnalysis';
+import { CharityAnalysis } from '@/utils/charityAnalysis';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
-// ...existing code...
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";

@@ -137,7 +137,7 @@ const performHiveAuthLogin = (username: string, callback: (user: HiveUser | null
 };
 
 // Login with HiveSigner
-export const loginWithHiveSigner = (callback: (user: HiveUser | null, error?: string) => void): void => {
+export const loginWithHiveSigner = (_callback: (user: HiveUser | null, error?: string) => void): void => {
   console.log("Attempting to login with HiveSigner");
 
   // Fix: Reducing client_id length to 16 characters or less
@@ -202,7 +202,7 @@ export const processHiveSignerCallback = (): Promise<HiveUser | null> => {
       return {
         username: data.username,
         loggedIn: true,
-        authType: 'hivesigner',
+        authType: 'hivesigner' as const,
         accessToken: data.access_token
       };
     } else {
@@ -224,6 +224,16 @@ declare global {
       requestHandshake: (callback: () => void) => void;
       getAccounts: () => string[];
       requestVote: (username: string, permlink: string, author: string, weight: number, callback: (response: any) => void) => void;
+      requestPost: (
+        username: string,
+        title: string,
+        body: string,
+        parentPermlink: string,
+        parentAuthor: string,
+        permlink: string,
+        jsonMetadata: string,
+        callback: (response: any) => void
+      ) => void;
     };
     hiveAuth: any;
   }

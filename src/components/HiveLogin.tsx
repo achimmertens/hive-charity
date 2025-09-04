@@ -10,7 +10,7 @@ import {
   HiveUser 
 } from "@/services/hiveAuth";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint, User, ExternalLink } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, KeyRound, Fingerprint, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -138,7 +138,7 @@ const HiveLogin: React.FC<HiveLoginProps> = ({ onLogin }) => {
   const handleHiveSignerLogin = () => {
     setIsLoading(true);
     setLoginMethod('hivesigner');
-    loginWithHiveSigner((user, error) => {
+    loginWithHiveSigner((_, error) => {
       if (error) {
         setIsLoading(false);
         setLoginMethod(null);
