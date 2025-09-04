@@ -70,7 +70,8 @@ const AnalysisHistory = () => {
       const { data, error, count } = await supabase
         .from('charity_analysis_results')
         .select('*', { count: 'exact' })
-        .order(sortKey, { ascending: sortDirection === 'asc' })
+        .eq('archived', false) // Nur nicht-archivierte Einträge anzeigen
+        .order('analyzed_at', { ascending: false }) // Immer nach Analysedatum sortieren
         .range(startIndex, endIndex);
       
       if (error) throw error;
