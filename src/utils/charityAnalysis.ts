@@ -54,17 +54,23 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         image_url: post.image_url,
         author_reputation: post.author_reputation,
         analyzed_at: new Date().toISOString(),
-        archived: false // ensure new analyses are not archived
+        title: post.title,
+        archived: false, // ensure new analyses are not archived
+        is_favorite: false // standardmäßig nicht als Favorit markiert
       };
 
       console.log('Saving to database (upsert):', analysisData);
       // Use upsert to ensure every scanned article appears only once, updated if re-scanned
       const { error: upsertError } = await supabase
         .from('charity_analysis_results')
-        .upsert([analysisData], { onConflict: 'article_url' });
+        .upsert([analysisData], { 
+          onConflict: 'article_url',
+          ignoreDuplicates: false // Bestehende Einträge aktualisieren
+        });
 
       if (upsertError) {
         console.error('Error storing analysis result:', upsertError);
+        throw upsertError; // Fehler weiterwerfen, damit die UI reagieren kann
       } else {
         console.log('Successfully saved to database (upsert)');
       }

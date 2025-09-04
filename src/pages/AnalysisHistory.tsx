@@ -20,7 +20,7 @@ import {
 const columns = [
   { key: 'author_name', label: 'Autor' },
   { key: 'author_reputation', label: 'Reputation' },
-  { key: 'created_at', label: 'Erstellt am' },
+  { key: 'analyzed_at', label: 'Analysiert am' },
   { key: 'title', label: 'Artikel-Titel' },
 ];
 
@@ -70,7 +70,7 @@ const AnalysisHistory = () => {
         .from('charity_analysis_results')
         .select('*', { count: 'exact' })
         .eq('archived', false) // Nur nicht-archivierte Einträge anzeigen
-        .order('analyzed_at', { ascending: false }) // Immer nach Analysedatum sortieren
+        .order(sortKey === 'analyzed_at' ? 'analyzed_at' : sortKey, { ascending: sortDirection === 'asc' })
         .range(startIndex, endIndex);
       
       if (error) throw error;
