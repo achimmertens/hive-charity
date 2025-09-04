@@ -21,6 +21,7 @@ interface Props {
   onToggleArchive?: (analysisId: string, value: boolean) => void;
   favoriteMap: Record<string, boolean>;
   archiveMap: Record<string, boolean>;
+  showArchiveButton?: boolean; // Optional prop für die Anzeige des Archiv-Buttons
 }
 
 const AnalysisHistoryTable: React.FC<Props> = ({

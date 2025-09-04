@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
@@ -375,3 +374,18 @@ const AnalysisHistory = () => {
 };
 
 export default AnalysisHistory;
+
+type Props = {
+  columns: { key: string; label: string }[];
+  analyses: any[];
+  charyMap: Record<string, boolean>;
+  sortKey: string;
+  sortDirection: 'asc' | 'desc';
+  onSort: (key: string) => void;
+  onToggleFavorite: (id: string, value: boolean) => void;
+  onToggleArchive: (id: string, value: boolean) => void;
+  onToggleChary: (analysisId: string, postId: string, value: boolean) => void;
+  favoriteMap: Record<string, boolean>;
+  archiveMap: Record<string, boolean>;
+  showArchiveButton: boolean;
+};
