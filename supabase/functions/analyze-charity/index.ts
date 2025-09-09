@@ -1,4 +1,5 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
@@ -13,14 +14,14 @@ serve(async (req) => {
   }
 
   try {
-    // Get the Gemini API key from environment (.env)
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    if (!GEMINI_API_KEY) {
-      console.error('Gemini API key not found in environment variables');
+    // Get the OpenAI API key from environment
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.error('OpenAI API key not found in environment variables');
       return new Response(
         JSON.stringify({
           error: true,
-          message: 'Gemini API key is missing. Please set the GEMINI_API_KEY secret in Supabase.',
+          message: 'OpenAI API key is missing. Please set the OPENAI_API_KEY secret in Supabase.',
           score: 0,
           summary: 'Die Analyse konnte nicht durchgeführt werden, da der API-Schlüssel fehlt.'
         }),
@@ -85,32 +86,38 @@ serve(async (req) => {
         }
       );
     }
-    // Compose the full prompt for Gemini
-    const prompt = `${charityPrompt}\n\n---\nNow analyze the following Hive blog post according to the instructions and examples above.\nTitle: ${title}\nContent: ${content.substring(0, 3000)}\n\nReturn your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
+    // Compose the full prompt for OpenAI
+    const systemPrompt = `${charityPrompt}\n\nAnalyze the following Hive blog post according to the instructions and examples above. Return your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
 
     try {
-      // Call Gemini API
-      console.log('Sending request to Gemini API...');
-      console.log('Using API key with first 5 chars:', GEMINI_API_KEY.substring(0, 5) + '...');
+      // Call OpenAI API
+      console.log('Sending request to OpenAI API...');
+      console.log('Using API key with first 5 chars:', OPENAI_API_KEY.substring(0, 5) + '...');
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
-      const response = await fetch(geminiUrl, {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
+          ],
+          max_tokens: 500,
+          temperature: 0.3
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Gemini API error: ${response.status} ${errorText}`);
+        console.error(`OpenAI API error: ${response.status} ${errorText}`);
         return new Response(
           JSON.stringify({
             error: true,
-            message: `Gemini API error: ${response.status}`,
+            message: `OpenAI API error: ${response.status}`,
             score: 0,
             summary: 'Fehler bei der Verbindung zum Analyse-Dienst. Bitte versuchen Sie es später erneut.'
           }),
@@ -125,25 +132,24 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log('Gemini API response received');
+      console.log('OpenAI API response received');
 
-      // Gemini response parsing
+      // OpenAI response parsing
       let answer = "";
       try {
-        // Robust: candidates kann fehlen oder leer sein
-        if (data && data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
-          answer = data.candidates[0].content.parts[0].text;
+        if (data && data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+          answer = data.choices[0].message.content;
         } else {
-          throw new Error("Gemini response missing candidates or content");
+          throw new Error("OpenAI response missing choices or content");
         }
       } catch (e) {
-        console.error('Failed to parse Gemini response:', e);
+        console.error('Failed to parse OpenAI response:', e);
         return new Response(
           JSON.stringify({
             error: true,
-            message: 'Fehler beim Parsen der Gemini-Antwort.',
+            message: 'Fehler beim Parsen der OpenAI-Antwort.',
             score: 0,
-            summary: 'Fehler beim Parsen der Gemini-Antwort.'
+            summary: 'Fehler beim Parsen der OpenAI-Antwort.'
           }),
           {
             status: 200,
@@ -158,9 +164,9 @@ serve(async (req) => {
       let result;
       try {
         result = JSON.parse(answer);
-        console.log('Successfully parsed JSON response from Gemini');
+        console.log('Successfully parsed JSON response from OpenAI');
       } catch (error) {
-        console.log('Failed to parse JSON response from Gemini, extracting manually');
+        console.log('Failed to parse JSON response from OpenAI, extracting manually');
         // Extract the score (looking for a number from 0-10)
         const scoreMatch = answer.match(/score['"]?\s*:\s*([0-9]|10)/i);
         const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
@@ -176,7 +182,7 @@ serve(async (req) => {
           summary = found || "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
         }
         result = { score, summary };
-        console.log('Manually extracted result from Gemini:', result);
+        console.log('Manually extracted result from OpenAI:', result);
       }
 
       // Validate that we have a score and summary
@@ -186,7 +192,7 @@ serve(async (req) => {
       if (!result.summary) {
         result.summary = "Keine klare Analyse verfügbar.";
       }
-      console.log('Final analysis result from Gemini:', result);
+      console.log('Final analysis result from OpenAI:', result);
 
       // Return the final result
       return new Response(
@@ -203,12 +209,12 @@ serve(async (req) => {
       );
       
     } catch (error) {
-      console.error('Gemini API request error:', error);
+      console.error('OpenAI API request error:', error);
       
       return new Response(
         JSON.stringify({
           error: true,
-          message: `Error calling Gemini API: ${error.message}`,
+          message: `Error calling OpenAI API: ${error.message}`,
           score: 0,
           summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
         }),
