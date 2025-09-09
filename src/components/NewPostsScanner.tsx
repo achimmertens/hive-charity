@@ -141,40 +141,57 @@ const NewPostsScanner: React.FC = () => {
             return (
               <div key={postId} className="grid md:grid-cols-2 gap-4">
                 <Card className="overflow-hidden transition-shadow hover:shadow-md">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xl">
-                      <a
-                        href={`https://peakd.com/@${post.author}/${post.permlink}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-hive transition-colors"
-                      >
-                        {post.title}
-                      </a>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-sm text-gray-500 flex items-center gap-4 mb-3">
-                      <span className="flex items-center"><User className="h-4 w-4 mr-1" />@{post.author}</span>
-                      <span className="flex items-center"><Calendar className="h-4 w-4 mr-1" />{formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}</span>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {post.image_url ? (
+                      <div className="md:col-span-1 h-48 md:h-full overflow-hidden bg-gray-100">
+                        <img 
+                          src={post.image_url} 
+                          alt={post.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                    <div className={`${post.image_url ? 'md:col-span-2' : 'md:col-span-3'} p-4`}>
+                      <CardHeader className="p-0 pb-2">
+                        <CardTitle className="text-xl">
+                          <a
+                            href={`https://peakd.com/@${post.author}/${post.permlink}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-hive transition-colors"
+                          >
+                            {post.title}
+                          </a>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="text-sm text-gray-500 flex items-center gap-4 mb-3">
+                          <span className="flex items-center"><User className="h-4 w-4 mr-1" />@{post.author}</span>
+                          <span className="flex items-center"><Calendar className="h-4 w-4 mr-1" />{formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}</span>
+                        </div>
+                        <p className="text-gray-600 line-clamp-3 mb-3">{post.body}</p>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {post.tags && post.tags.slice(0, 5).map(tag => (
+                            <Badge key={tag} variant="secondary" className="flex items-center">
+                              <Tag className="h-3 w-3 mr-1" />{tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <a
+                          className="inline-flex items-center text-hive hover:underline text-sm"
+                          href={`https://peakd.com/@${post.author}/${post.permlink}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" /> Beitrag öffnen
+                        </a>
+                      </CardContent>
                     </div>
-                    <p className="text-gray-600 line-clamp-3 mb-3">{post.body}</p>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {post.tags && post.tags.slice(0, 5).map(tag => (
-                        <Badge key={tag} variant="secondary" className="flex items-center">
-                          <Tag className="h-3 w-3 mr-1" />{tag}
-                        </Badge>
-                      ))}
-                    </div>
-                    <a
-                      className="inline-flex items-center text-hive hover:underline text-sm"
-                      href={`https://peakd.com/@${post.author}/${post.permlink}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" /> Beitrag öffnen
-                    </a>
-                  </CardContent>
+                  </div>
                 </Card>
                 <CharityAnalysisDisplay analysis={analysis} loading={analysis === null} />
               </div>
