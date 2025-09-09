@@ -40,7 +40,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
       .from('charity_analysis_results')
       .select('*')
       .order('analyzed_at', { ascending: false })
-      .limit(10)
+      .limit(20)
       .then(({ data, error }) => {
         if (error) {
           setError('Fehler beim Laden der letzten 10 Analysen.');
@@ -131,11 +131,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
   }
 
   return (
-    <div>
-      <div className="flex flex-col mb-6 space-y-2">
-        <h2 className="text-2xl font-bold">Aktuelle Charity-Beiträge</h2>
-      </div>
-      <div className="grid grid-cols-1 gap-6">
+    <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const postId = `${post.author}/${post.permlink}`;
           const analysis = analyses[postId];
@@ -290,7 +286,6 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
             </div>
           );
         })}
-      </div>
     </div>
   );
 };

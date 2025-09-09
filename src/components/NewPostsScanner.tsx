@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { AlertTriangle, Calendar, ExternalLink, Tag, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { HivePost, fetchCharityPosts } from "@/services/hivePost";
@@ -10,13 +10,23 @@ import { CharityAnalysisDisplay } from "./CharityAnalysis";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
+import { Textarea } from "@/components/ui/textarea";
+import { postComment } from "@/services/hiveComment";
+import { HiveUser } from "@/services/hiveAuth";
 
-const NewPostsScanner: React.FC = () => {
+interface NewPostsScannerProps {
+  user: HiveUser;
+}
+
+const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<HivePost[]>([]);
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
   const [ranOnce, setRanOnce] = useState(false);
+  const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState<Record<string, boolean>>({});
   const maxShown = 20;
 
   // Load persisted entries on mount
@@ -156,44 +166,136 @@ const NewPostsScanner: React.FC = () => {
                       </div>
                     ) : null}
                     <div className={`${post.image_url ? 'md:col-span-2' : 'md:col-span-3'} p-4`}>
-                      <CardHeader className="p-0 pb-2">
-                        <CardTitle className="text-xl">
-                          <a
-                            href={`https://peakd.com/@${post.author}/${post.permlink}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-hive transition-colors"
-                          >
-                            {post.title}
-                          </a>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="text-sm text-gray-500 flex items-center gap-4 mb-3">
-                          <span className="flex items-center"><User className="h-4 w-4 mr-1" />@{post.author}</span>
-                          <span className="flex items-center"><Calendar className="h-4 w-4 mr-1" />{formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}</span>
+                      <CardHeader className="p-0 pb-2 flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-xl line-clamp-2">
+                            <a 
+                              href={`https://peakd.com/@${post.author}/${post.permlink}`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="hover:text-hive transition-colors"
+                            >
+                              {post.title}
+                            </a>
+                          </CardTitle>
+                          <CardDescription className="flex items-center mt-2 space-x-4 text-sm text-gray-500">
+                            <span className="flex items-center">
+                              <User className="h-4 w-4 mr-1" /> 
+                              <a 
+                                href={`https://peakd.com/@${post.author}`}
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="hover:text-hive transition-colors"
+                              >
+                                @{post.author}
+                              </a>
+                            </span>
+                            <span className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1" /> 
+                              {formatDistanceToNow(new Date(post.created), { addSuffix: true, locale: de })}
+                            </span>
+                          </CardDescription>
                         </div>
-                        <p className="text-gray-600 line-clamp-3 mb-3">{post.body}</p>
-                        <div className="flex flex-wrap gap-2 mb-2">
+                      </CardHeader>
+                      <CardContent className="p-0 py-4">
+                        <p className="text-gray-600 line-clamp-3 mb-4">{post.body}</p>
+                        <div className="flex flex-wrap gap-2 mb-4">
                           {post.tags && post.tags.slice(0, 5).map(tag => (
                             <Badge key={tag} variant="secondary" className="flex items-center">
-                              <Tag className="h-3 w-3 mr-1" />{tag}
+                              <Tag className="h-3 w-3 mr-1" /> 
+                              {tag}
                             </Badge>
                           ))}
+                          {post.community && (
+                            <Badge variant="outline" className="border-hive text-hive">
+                              {post.community_title || post.community}
+                            </Badge>
+                          )}
                         </div>
-                        <a
-                          className="inline-flex items-center text-hive hover:underline text-sm"
-                          href={`https://peakd.com/@${post.author}/${post.permlink}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" /> Beitrag öffnen
-                        </a>
                       </CardContent>
+                      <CardFooter className="p-0 flex justify-between items-center">
+                        <div className="flex items-center text-sm text-gray-500">
+                          <span className="font-semibold text-green-600">${(post.payout || 0).toFixed(2)}</span>
+                        </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`https://peakd.com/@${post.author}/${post.permlink}`, '_blank')}
+                              className="text-gray-600 flex items-center"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const prefill = analysis
+                                  ? `Chary-Score: ${analysis.charyScore}/10\n\nKI-Antwort:\n${analysis.summary}\n\n`
+                                  : '';
+                                setReplyOpen((prev) => ({ ...prev, [postId]: !prev[postId] }));
+                                if (!replyText[postId]) setReplyText((prev) => ({ ...prev, [postId]: prefill }));
+                              }}
+                            >
+                              Antworten
+                            </Button>
+                          </div>
+                      </CardFooter>
                     </div>
                   </div>
                 </Card>
-                <CharityAnalysisDisplay analysis={analysis} loading={analysis === null} />
+                <CharityAnalysisDisplay 
+                  analysis={analysis} 
+                  loading={analysis === null}
+                />
+                {replyOpen[postId] && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Antwort verfassen</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={replyText[postId] || ''}
+                        onChange={(e) => setReplyText((prev) => ({ ...prev, [postId]: e.target.value }))}
+                        rows={8}
+                        placeholder="Ihre Antwort..."
+                      />
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReplyOpen((prev) => ({ ...prev, [postId]: false }))}
+                      >
+                        Abbrechen
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={sending[postId] || !user?.loggedIn}
+                        onClick={() => {
+                          if (!user || !user.loggedIn) {
+                            alert('Bitte loggen Sie sich ein, um zu antworten.');
+                            return;
+                          }
+                          const body = replyText[postId] || '';
+                          if (body.trim().length === 0) {
+                            alert('Antwort darf nicht leer sein.');
+                            return;
+                          }
+                          setSending((prev) => ({ ...prev, [postId]: true }));
+                          postComment(user, post.author, post.permlink, body, (success, message) => {
+                            setSending((prev) => ({ ...prev, [postId]: false }));
+                            alert(message);
+                            if (success) {
+                              setReplyOpen((prev) => ({ ...prev, [postId]: false }));
+                            }
+                          });
+                        }}
+                      >
+                        {sending[postId] ? 'Senden...' : 'Senden'}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                )}
               </div>
             );
           })}

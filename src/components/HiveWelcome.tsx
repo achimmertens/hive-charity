@@ -22,8 +22,11 @@ const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user }) => {
 
       <div className="max-w-4xl mx-auto">
         {/* Neue Beiträge suchen Button und Ergebnisliste */}
-        <NewPostsScanner />
-        <CharityPostsEnhanced user={user} />
+        <NewPostsScanner user={user} />
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Aktuelle Charity-Beiträge</h2>
+          <CharityPostsEnhanced user={user} />
+        </div>
       </div>
     </div>
   );
