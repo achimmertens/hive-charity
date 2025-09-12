@@ -69,7 +69,13 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
             community_title: a.community_title || ""
           };
         });
-        setPosts(postsFromHistory);
+        // Deduplicate by author/permlink to avoid duplicate React keys
+        const uniqueById = Array.from(
+          new Map(
+            postsFromHistory.map((p) => [`${p.author}/${p.permlink}`, p])
+          ).values()
+        );
+        setPosts(uniqueById);
         // Update analyses state
         const newAnalyses: Record<string, CharityAnalysis | null> = {};
         (data ?? []).forEach((analysis: any) => {

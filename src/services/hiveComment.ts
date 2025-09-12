@@ -1,4 +1,4 @@
-import { HiveUser, AuthType } from "./hiveAuth";
+import { HiveUser } from "./hiveAuth";
 
 // Utility to generate a unique permlink for a comment
 function generateCommentPermlink(parentAuthor: string, parentPermlink: string) {
@@ -57,28 +57,86 @@ export function postComment(
           body: body.slice(0, 50) + "..." // Nur für Debug-Zwecke gekürzt
         });
 
-        window.hive_keychain.requestPost(
-        user.username,
-        permlink,
-        body,
-        parentPermlink,
-        parentAuthor,
-        "",
-        jsonMetadata,
-        (response: any) => {
-          console.log("Keychain response:", response);
-          if (response?.success) {
-            onResult(true, "Antwort wurde erfolgreich gepostet!");
-            // Kurze Pause für die UI-Aktualisierung
-            setTimeout(() => {
-              window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
-            }, 2000);
-          } else {
-            console.error("Keychain error:", response);
-            onResult(false, response?.message || "Fehler beim Posten der Antwort.");
+        const keychain = window.hive_keychain!;
+        const doPost = () => {
+          try {
+            const operations = [[
+              "comment",
+              {
+                parent_author: parentAuthor,
+                parent_permlink: parentPermlink,
+                author: user.username,
+                permlink,
+                title: "",
+                body,
+                json_metadata: jsonMetadata
+              }
+            ]];
+
+            console.log("Keychain requestBroadcast operations:", operations);
+            let responded = false;
+            const noCallbackTimer = setTimeout(() => {
+              if (!responded) {
+                console.warn("Keychain did not respond within 15s");
+                onResult(false, "Keine Antwort von Hive Keychain. Bitte erneut versuchen.");
+              }
+            }, 15000);
+
+            keychain.requestBroadcast(
+              user.username,
+              operations as any,
+              "Posting",
+              (broadcastResponse: any) => {
+                responded = true;
+                clearTimeout(noCallbackTimer);
+                console.log("Keychain broadcast response:", broadcastResponse);
+                if (broadcastResponse?.success) {
+                  onResult(true, "Antwort wurde erfolgreich gepostet!");
+                  setTimeout(() => {
+                    window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
+                  }, 2000);
+                } else {
+                  console.warn("Broadcast failed, trying requestPost as fallback.", broadcastResponse);
+                  try {
+                    // Try legacy requestPost as a fallback (two possible signatures)
+                    const tryLegacy = (cb: (r: any) => void) =>
+                      keychain.requestPost(
+                        user.username,
+                        permlink,
+                        body,
+                        parentPermlink,
+                        parentAuthor,
+                        "",
+                        jsonMetadata,
+                        cb
+                      );
+                    tryLegacy((response: any) => {
+                      console.log("Keychain requestPost fallback response:", response);
+                      if (response?.success) {
+                        onResult(true, "Antwort wurde erfolgreich gepostet!");
+                        setTimeout(() => {
+                          window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
+                        }, 2000);
+                      } else {
+                        console.error("Keychain requestPost fallback failed:", response);
+                        onResult(false, response?.message || "Fehler beim Posten der Antwort.");
+                      }
+                    });
+                  } catch (fallbackErr) {
+                    console.error("Exception in requestPost fallback:", fallbackErr);
+                    onResult(false, "Technischer Fehler beim Posten der Antwort.");
+                  }
+                }
+              }
+            );
+          } catch (innerError) {
+            console.error("Exception calling requestBroadcast:", innerError);
+            onResult(false, "Technischer Fehler beim Posten der Antwort.");
           }
-        }
-      );
+        };
+
+        // Directly post without handshake to avoid request_id null issues seen in some environments
+        doPost();
       } catch (error) {
         console.error("Exception in Keychain integration:", error);
         onResult(false, "Technischer Fehler beim Posten der Antwort.");
