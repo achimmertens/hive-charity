@@ -1,4 +1,4 @@
-import { HiveUser } from "./hiveAuth";
+import { HiveUser, AuthType } from "./hiveAuth";
 
 // Utility to generate a unique permlink for a comment
 function generateCommentPermlink(parentAuthor: string, parentPermlink: string) {
@@ -10,7 +10,7 @@ function generateCommentPermlink(parentAuthor: string, parentPermlink: string) {
 }
 
 export function postComment(
-  user: HiveUser,
+  user: HiveUser & { authType: 'keychain' | 'hivesigner' },
   parentAuthor: string,
   parentPermlink: string,
   body: string,
@@ -25,23 +25,68 @@ export function postComment(
   const jsonMetadata = JSON.stringify({ app: "hive-charity-explorer", tags: ["charity"] });
 
   // If logged in with Hive Keychain
-  if (user.authType === "keychain" && typeof window !== "undefined" && window.hive_keychain) {
-    window.hive_keychain.requestPost(
-      user.username,
-      "",
-      body,
-      parentPermlink,
-      parentAuthor,
-      permlink,
-      jsonMetadata,
-      (response: any) => {
-        if (response?.success) {
-          onResult(true, "Antwort wurde gepostet.");
-        } else {
-          onResult(false, response?.message || "Fehler beim Posten der Antwort.");
-        }
+  if (user.authType === "keychain") {
+    if (typeof window === "undefined") {
+      onResult(false, "Browser-Umgebung nicht verfügbar");
+      return;
+    }
+
+    // Warte bis Keychain verfügbar ist
+    let retries = 0;
+    const maxRetries = 5;
+    const waitForKeychain = () => {
+      if (retries >= maxRetries) {
+        onResult(false, "Hive Keychain nicht gefunden. Bitte installieren Sie die Browser-Erweiterung.");
+        return;
       }
-    );
+
+      if (!window.hive_keychain) {
+        retries++;
+        console.log(`Waiting for Keychain (attempt ${retries})...`);
+        setTimeout(waitForKeychain, 1000);
+        return;
+      }
+
+      try {
+        console.log("Hive Keychain gefunden, starte Kommentar-Posting");
+        console.log("Parameter:", {
+          username: user.username,
+          parentAuthor,
+          parentPermlink,
+          permlink,
+          body: body.slice(0, 50) + "..." // Nur für Debug-Zwecke gekürzt
+        });
+
+        window.hive_keychain.requestPost(
+        user.username,
+        permlink,
+        body,
+        parentPermlink,
+        parentAuthor,
+        "",
+        jsonMetadata,
+        (response: any) => {
+          console.log("Keychain response:", response);
+          if (response?.success) {
+            onResult(true, "Antwort wurde erfolgreich gepostet!");
+            // Kurze Pause für die UI-Aktualisierung
+            setTimeout(() => {
+              window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
+            }, 2000);
+          } else {
+            console.error("Keychain error:", response);
+            onResult(false, response?.message || "Fehler beim Posten der Antwort.");
+          }
+        }
+      );
+      } catch (error) {
+        console.error("Exception in Keychain integration:", error);
+        onResult(false, "Technischer Fehler beim Posten der Antwort.");
+      }
+    };
+
+    // Start waiting for keychain
+    waitForKeychain();
     return;
   }
 
@@ -49,9 +94,13 @@ export function postComment(
   if (user.authType === "hivesigner") {
     const url = `https://hivesigner.com/sign/comment?parent_author=${encodeURIComponent(
       parentAuthor
-    )}&parent_permlink=${encodeURIComponent(parentPermlink)}&author=${encodeURIComponent(
+    )}&parent_permlink=${encodeURIComponent(
+      parentPermlink
+    )}&author=${encodeURIComponent(
       user.username
-    )}&permlink=${encodeURIComponent(permlink)}&title=&body=${encodeURIComponent(
+    )}&permlink=${encodeURIComponent(
+      permlink
+    )}&title=&body=${encodeURIComponent(
       body
     )}&json_metadata=${encodeURIComponent(jsonMetadata)}`;
     // Open HiveSigner signing page in a new tab

@@ -1,8 +1,12 @@
 
+export type AuthType = 'keychain' | 'hiveauth' | 'hivesigner';
+
+
+
 export interface HiveUser {
   username: string;
   loggedIn: boolean;
-  authType?: 'keychain' | 'hiveauth' | 'hivesigner';
+  authType?: AuthType;
   accessToken?: string; // For HiveSigner
 }
 
@@ -67,7 +71,7 @@ const performKeychainLogin = (username: string, callback: (user: HiveUser | null
   
   console.log(`Requesting keychain sign buffer for user ${username}`);
   
-  window.hive_keychain.requestSignBuffer(
+  (window.hive_keychain as HiveKeychain).requestSignBuffer(
     username,
     message,
     "Posting", // Use the posting key for authentication
@@ -216,25 +220,4 @@ export const processHiveSignerCallback = (): Promise<HiveUser | null> => {
   });
 };
 
-// Add type definitions for the global window object
-declare global {
-  interface Window {
-    hive_keychain: {
-      requestSignBuffer: (username: string, message: string, method: string, callback: (response: any) => void) => void;
-      requestHandshake: (callback: () => void) => void;
-      getAccounts: () => string[];
-      requestVote: (username: string, permlink: string, author: string, weight: number, callback: (response: any) => void) => void;
-      requestPost: (
-        username: string,
-        title: string,
-        body: string,
-        parentPermlink: string,
-        parentAuthor: string,
-        permlink: string,
-        jsonMetadata: string,
-        callback: (response: any) => void
-      ) => void;
-    };
-    hiveAuth: any;
-  }
-}
+
