@@ -173,3 +173,58 @@ export function postComment(
   onResult(false, "Antworten über HiveAuth wird noch nicht unterstützt.");
 }
 
+
+export function votePost(
+  user: HiveUser & { authType: 'keychain' | 'hivesigner' },
+  author: string,
+  permlink: string,
+  weightPercent: number,
+  onResult: (success: boolean, message: string) => void
+) {
+  if (!user || !user.loggedIn) {
+    onResult(false, "Bitte zuerst einloggen.");
+    return;
+  }
+
+  const weight = Math.max(0, Math.min(100, Math.round(weightPercent))) * 100; // Hive weight: 0..10000
+
+  if (user.authType === 'keychain') {
+    if (typeof window === 'undefined' || !window.hive_keychain) {
+      onResult(false, 'Hive Keychain nicht verfügbar.');
+      return;
+    }
+    try {
+      console.log('Keychain vote request:', { username: user.username, author, permlink, weight });
+      window.hive_keychain.requestVote(
+        user.username,
+        permlink,
+        author,
+        weight,
+        (response: any) => {
+          console.log('Keychain vote response:', response);
+          if (response?.success) {
+            onResult(true, 'Upvote erfolgreich gesendet.');
+          } else {
+            onResult(false, response?.message || 'Fehler beim Senden des Upvotes.');
+          }
+        }
+      );
+    } catch (e) {
+      console.error('Keychain vote exception:', e);
+      onResult(false, 'Technischer Fehler beim Upvote.');
+    }
+    return;
+  }
+
+  if (user.authType === 'hivesigner') {
+    const url = `https://hivesigner.com/sign/vote?author=${encodeURIComponent(author)}&permlink=${encodeURIComponent(permlink)}&voter=${encodeURIComponent(user.username)}&weight=${weight}`;
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+      onResult(true, 'Weiterleitung zu HiveSigner zum Signieren des Upvotes.');
+    }
+    return;
+  }
+
+  onResult(false, 'Upvote über HiveAuth wird noch nicht unterstützt.');
+}
+

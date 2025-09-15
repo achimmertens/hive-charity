@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { AlertTriangle, Calendar, ExternalLink, Tag, User } from "lucide-react";
+import { AlertTriangle, Calendar, ExternalLink, Tag, User, ThumbsUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { HivePost, fetchCharityPosts } from "@/services/hivePost";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
-import { postComment } from "@/services/hiveComment";
+import { postComment, votePost } from "@/services/hiveComment";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 import { HiveUser } from "@/services/hiveAuth";
 
 interface NewPostsScannerProps {
@@ -27,6 +29,9 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<Record<string, boolean>>({});
+  const [voteOpen, setVoteOpen] = useState<Record<string, boolean>>({});
+  const [voteValue, setVoteValue] = useState<Record<string, number>>({});
+  const [voting, setVoting] = useState<Record<string, boolean>>({});
   const maxShown = 20;
 
   // Load persisted entries on mount
@@ -220,6 +225,36 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                           <div className="flex items-center space-x-2">
                             <Button
                               variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                if (!user || !user.loggedIn || !user.authType) {
+                                  toast({ title: 'Bitte loggen Sie sich ein, um zu voten.' });
+                                  return;
+                                }
+                                if (user.authType !== 'keychain' && user.authType !== 'hivesigner') {
+                                  toast({ title: 'Bitte nutzen Sie Keychain oder HiveSigner zum Voten.' });
+                                  return;
+                                }
+                                setVoting((prev) => ({ ...prev, [postId]: true }));
+                                votePost(
+                                  { ...user, authType: user.authType as 'keychain' | 'hivesigner' },
+                                  post.author,
+                                  post.permlink,
+                                  100,
+                                  (success, message) => {
+                                    setVoting((prev) => ({ ...prev, [postId]: false }));
+                                    toast({ title: message });
+                                  }
+                                );
+                              }}
+                              disabled={voting[postId] || !user?.loggedIn || !user?.authType}
+                              aria-label="Upvote"
+                              title="Upvote"
+                            >
+                              <ThumbsUp className={`h-4 w-4 ${voting[postId] ? 'animate-pulse' : ''}`} />
+                            </Button>
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => window.open(`https://peakd.com/@${post.author}/${post.permlink}`, '_blank')}
                               className="text-gray-600 flex items-center"
@@ -282,13 +317,23 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                             return;
                           }
                           setSending((prev) => ({ ...prev, [postId]: true }));
-                          postComment(user, post.author, post.permlink, body, (success, message) => {
-                            setSending((prev) => ({ ...prev, [postId]: false }));
-                            alert(message);
-                            if (success) {
-                              setReplyOpen((prev) => ({ ...prev, [postId]: false }));
+                          if (!user.authType || (user.authType !== 'keychain' && user.authType !== 'hivesigner')) {
+                            toast({ title: 'Bitte nutzen Sie Keychain oder HiveSigner zum Kommentieren.' });
+                            return;
+                          }
+                          postComment(
+                            { ...user, authType: user.authType as 'keychain' | 'hivesigner' },
+                            post.author,
+                            post.permlink,
+                            body,
+                            (success, message) => {
+                              setSending((prev) => ({ ...prev, [postId]: false }));
+                              toast({ title: message });
+                              if (success) {
+                                setReplyOpen((prev) => ({ ...prev, [postId]: false }));
+                              }
                             }
-                          });
+                          );
                         }}
                       >
                         {sending[postId] ? 'Senden...' : 'Senden'}
@@ -296,6 +341,65 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                     </CardFooter>
                   </Card>
                 )}
+
+                <Dialog open={!!voteOpen[postId]} onOpenChange={(open) => setVoteOpen((prev) => ({ ...prev, [postId]: open }))}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Upvote vergeben</DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span>Stärke</span>
+                        <span className="font-semibold">{voteValue[postId] ?? 100}%</span>
+                      </div>
+                      <Slider
+                        value={[voteValue[postId] ?? 100]}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onValueChange={(val) => setVoteValue((prev) => ({ ...prev, [postId]: val[0] }))}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setVoteOpen((prev) => ({ ...prev, [postId]: false }))}
+                      >
+                        Abbrechen
+                      </Button>
+                      <Button
+                        disabled={voting[postId] || !user?.loggedIn}
+                        onClick={() => {
+                          if (!user || !user.loggedIn) {
+                            toast({ title: 'Bitte loggen Sie sich ein, um zu voten.' });
+                            return;
+                          }
+                          const weight = voteValue[postId] ?? 100;
+                          setVoting((prev) => ({ ...prev, [postId]: true }));
+                          if (!user.authType || (user.authType !== 'keychain' && user.authType !== 'hivesigner')) {
+                            toast({ title: 'Bitte nutzen Sie Keychain oder HiveSigner zum Voten.' });
+                            return;
+                          }
+                          votePost(
+                            { ...user, authType: user.authType as 'keychain' | 'hivesigner' },
+                            post.author,
+                            post.permlink,
+                            weight,
+                            (success, message) => {
+                              setVoting((prev) => ({ ...prev, [postId]: false }));
+                              toast({ title: message });
+                              if (success) {
+                                setVoteOpen((prev) => ({ ...prev, [postId]: false }));
+                              }
+                            }
+                          );
+                        }}
+                      >
+                        {voting[postId] ? 'Sende...' : 'Upvote senden'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             );
           })}
