@@ -40,7 +40,12 @@ export const CharityAnalysisDisplay: React.FC<CharityAnalysisProps> = ({ analysi
     <Card className="w-full h-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Charity Score: {analysis.charyScore}/10</span>
+          <span className="flex items-center gap-2">
+            Charity Score: {analysis.charyScore}/10
+            {analysis.isMock && (
+              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Mock</span>
+            )}
+          </span>
           <AlertCircle className={`h-6 w-6 ${analysis.charyScore >= 7 ? 'text-green-500' : analysis.charyScore >= 4 ? 'text-yellow-500' : 'text-red-500'}`} />
         </CardTitle>
       </CardHeader>

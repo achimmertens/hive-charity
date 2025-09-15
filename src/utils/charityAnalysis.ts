@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface CharityAnalysis {
   charyScore: number;
   summary: string;
+  isMock?: boolean;
 }
 
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
@@ -16,14 +17,28 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     
     // Call our Supabase Edge Function
     console.log('Sending request to Edge Function...');
+    const requestPayload = {
+      title: post.title,
+      content: postContent
+    };
+    try { console.log('Edge Function request payload (truncated):', { title: requestPayload.title, content: requestPayload.content?.slice(0, 500) + '...' }); } catch {}
     
     try {
+      let promptFromClient: string | undefined;
+      try {
+        // Try to import the examples from src to pass into the edge function
+        // @ts-ignore - vite raw import
+        const raw = await import('@/charityExamples.txt?raw');
+        promptFromClient = typeof raw.default === 'string' ? raw.default : undefined;
+        if (promptFromClient) {
+          console.log('Loaded charityExamples.txt from src (client)');
+        }
+      } catch (e) {
+        console.warn('Could not load src/charityExamples.txt on client:', e);
+      }
       // Use Supabase client to call the edge function
       const { data, error } = await supabase.functions.invoke('analyze-charity', {
-        body: JSON.stringify({
-          title: post.title,
-          content: postContent
-        }),
+        body: JSON.stringify({ ...requestPayload, prompt: promptFromClient }),
       });
       
       if (error) {
@@ -42,7 +57,12 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         return generateMockAnalysis(postContent);
       }
       
-      console.log('Analysis result:', data);
+      console.log('Edge Function response:', data);
+      if (data?.model) {
+        console.log('Edge Function indicates OpenAI model used:', data.model);
+      } else {
+        console.warn('Edge Function did not include model info.');
+      }
       // Store the analysis result in the database
       // Always upsert (insert or update) so every scanned article appears in the history
       const analysisData = {
@@ -77,7 +97,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       
       return {
         charyScore: typeof data.score === 'number' ? data.score : 0,
-        summary: data.summary || "Keine klare Analyse verfügbar."
+        summary: data.summary || "Keine klare Analyse verfügbar.",
+        isMock: false
       };
       
     } catch (error) {
@@ -89,7 +110,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
     console.error('Error analyzing charity post:', error);
     return {
       charyScore: 0,
-      summary: "Fehler bei der Analyse. Bitte versuchen Sie es später erneut."
+      summary: "Fehler bei der Analyse. Bitte versuchen Sie es später erneut.",
+      isMock: true
     };
   }
 }
@@ -116,6 +138,7 @@ function generateMockAnalysis(postContent: string): CharityAnalysis {
   
   return {
     charyScore: mockScore,
-    summary: mockSummary
+    summary: mockSummary + " (Mock)",
+    isMock: true
   };
 }

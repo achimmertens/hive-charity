@@ -37,7 +37,7 @@ serve(async (req) => {
 
     // Parse the request body
     const requestData = await req.json();
-    const { title, content } = requestData;
+    const { title, content, prompt } = requestData;
     
     if (!title || !content) {
       console.error('Missing required parameters:', { title: !!title, content: !!content });
@@ -62,29 +62,20 @@ serve(async (req) => {
     console.log('Content length:', content.length);
 
     // Prepare the prompt for OpenAI
-    // Load the strict prompt and examples from environment variable
-    // Load the prompt and examples from charityExamples.txt at runtime
+    // Priority: client-provided prompt, then local file
     let charityPrompt = '';
-    try {
-      // Read prompt and examples from function directory
-      charityPrompt = await Deno.readTextFile('./charityExamples.txt');
-    } catch (err) {
-      console.error('Could not read charityExamples.txt:', err);
-      return new Response(
-        JSON.stringify({
-          error: true,
-          message: 'Could not read charityExamples.txt. Please ensure the file exists in the function folder.',
-          score: 0,
-          summary: 'Die Analyse konnte nicht durchgeführt werden, da die Prompt-Datei fehlt.'
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+    if (prompt && typeof prompt === 'string' && prompt.trim().length > 0) {
+      charityPrompt = prompt;
+      console.log('Using client-provided prompt (charityExamples)');
+    } else {
+      try {
+        charityPrompt = await Deno.readTextFile('./charityExamples.txt');
+        console.log('Loaded prompt from function folder (charityExamples.txt)');
+      } catch (err) {
+        console.error('Could not read charityExamples.txt:', err);
+        // Continue with a minimal system prompt instead of failing hard
+        charityPrompt = 'You are a charity content evaluator. Score from 0-10 and summarize.';
+      }
     }
     // Compose the full prompt for OpenAI
     const systemPrompt = `${charityPrompt}\n\nAnalyze the following Hive blog post according to the instructions and examples above. Return your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
@@ -93,6 +84,7 @@ serve(async (req) => {
       // Call OpenAI API
       console.log('Sending request to OpenAI API...');
       console.log('Using API key with first 5 chars:', OPENAI_API_KEY.substring(0, 5) + '...');
+      const model = 'gpt-4o-mini';
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -101,7 +93,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
@@ -133,6 +125,10 @@ serve(async (req) => {
 
       const data = await response.json();
       console.log('OpenAI API response received');
+      console.log('OpenAI model used:', model);
+      try {
+        console.log('OpenAI raw choice snippet:', JSON.stringify(data?.choices?.[0], null, 2));
+      } catch (_) {}
 
       // OpenAI response parsing
       let answer = "";
@@ -198,7 +194,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           score: result.score,
-          summary: result.summary
+          summary: result.summary,
+          model
         }),
         {
           headers: {
