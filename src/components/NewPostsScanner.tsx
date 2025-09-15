@@ -300,11 +300,13 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                             </Button>
                             <Button
                               variant="outline"
-                              size="sm"
+                              size="icon"
                               onClick={() => window.open(`https://peakd.com/@${post.author}/${post.permlink}`, '_blank')}
-                              className="text-gray-600 flex items-center"
+                              className="text-gray-600"
+                              title="Ansehen"
+                              aria-label="Ansehen"
                             >
-                              <ExternalLink className="h-4 w-4 mr-1" /> Ansehen
+                              <ExternalLink className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"

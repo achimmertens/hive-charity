@@ -92,9 +92,6 @@ export function postComment(
                 console.log("Keychain broadcast response:", broadcastResponse);
                 if (broadcastResponse?.success) {
                   onResult(true, "Antwort wurde erfolgreich gepostet!");
-                  setTimeout(() => {
-                    window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
-                  }, 2000);
                 } else {
                   console.warn("Broadcast failed, trying requestPost as fallback.", broadcastResponse);
                   try {
@@ -114,9 +111,6 @@ export function postComment(
                       console.log("Keychain requestPost fallback response:", response);
                       if (response?.success) {
                         onResult(true, "Antwort wurde erfolgreich gepostet!");
-                        setTimeout(() => {
-                          window.location.href = `https://peakd.com/@${parentAuthor}/${parentPermlink}#${permlink}`;
-                        }, 2000);
                       } else {
                         console.error("Keychain requestPost fallback failed:", response);
                         onResult(false, response?.message || "Fehler beim Posten der Antwort.");
