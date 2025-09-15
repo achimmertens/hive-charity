@@ -235,17 +235,8 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                                   toast({ title: 'Bitte nutzen Sie Keychain oder HiveSigner zum Voten.' });
                                   return;
                                 }
-                                setVoting((prev) => ({ ...prev, [postId]: true }));
-                                votePost(
-                                  { ...user, authType: user.authType as 'keychain' | 'hivesigner' },
-                                  post.author,
-                                  post.permlink,
-                                  100,
-                                  (success, message) => {
-                                    setVoting((prev) => ({ ...prev, [postId]: false }));
-                                    toast({ title: message });
-                                  }
-                                );
+                                setVoteOpen((prev) => ({ ...prev, [postId]: true }));
+                                if (voteValue[postId] == null) setVoteValue((prev) => ({ ...prev, [postId]: 100 }));
                               }}
                               disabled={voting[postId] || !user?.loggedIn || !user?.authType}
                               aria-label="Upvote"
