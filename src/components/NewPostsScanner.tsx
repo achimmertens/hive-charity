@@ -32,7 +32,47 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [voteOpen, setVoteOpen] = useState<Record<string, boolean>>({});
   const [voteValue, setVoteValue] = useState<Record<string, number>>({});
   const [voting, setVoting] = useState<Record<string, boolean>>({});
+  const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
   const maxShown = 20;
+
+  // Check if user has voted on posts
+  const checkVoteStatus = async (posts: HivePost[], username: string) => {
+    if (!username) return;
+    
+    try {
+      const voteChecks = posts.map(async (post) => {
+        const postId = `${post.author}/${post.permlink}`;
+        try {
+          const response = await fetch("https://api.hive.blog", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "condenser_api.get_active_votes",
+              params: [post.author, post.permlink],
+              id: 1
+            })
+          });
+          const data = await response.json();
+          const votes = data.result || [];
+          const userVoted = votes.some((vote: any) => vote.voter === username);
+          return { postId, voted: userVoted };
+        } catch (error) {
+          console.error(`Failed to check vote status for ${postId}:`, error);
+          return { postId, voted: false };
+        }
+      });
+      
+      const results = await Promise.all(voteChecks);
+      const voteStatus: Record<string, boolean> = {};
+      results.forEach(({ postId, voted }) => {
+        voteStatus[postId] = voted;
+      });
+      setHasVoted(voteStatus);
+    } catch (error) {
+      console.error('Failed to check vote status:', error);
+    }
+  };
 
   // Load persisted entries on mount
   React.useEffect(() => {
@@ -48,11 +88,16 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         setPosts(restoredPosts);
         setAnalyses(restoredAnalyses);
         setRanOnce(true);
+        
+        // Check vote status for restored posts
+        if (user?.username) {
+          checkVoteStatus(restoredPosts, user.username);
+        }
       }
     } catch (e) {
       console.warn('Failed to restore current posts', e);
     }
-  }, []);
+  }, [user?.username]);
 
   const handleScan = async () => {
     if (loading) return;
@@ -119,6 +164,11 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
 
       setAnalyses(finalAnalyses);
       setPosts(persisted.map(p => p.post));
+
+      // Check vote status for new posts
+      if (user?.username) {
+        checkVoteStatus(persisted.map(p => p.post), user.username);
+      }
 
       toast({ title: `${newOnes.length} neue Beiträge analysiert`, description: "Die Ergebnisse wurden auch in der Historie gespeichert." });
     } catch (error) {
@@ -242,7 +292,11 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               aria-label="Upvote"
                               title="Upvote"
                             >
-                              <ThumbsUp className={`h-4 w-4 ${voting[postId] ? 'animate-pulse' : ''}`} />
+                              <ThumbsUp 
+                                className={`h-4 w-4 ${voting[postId] ? 'animate-pulse' : ''}`} 
+                                fill={hasVoted[postId] ? '#3b82f6' : 'none'}
+                                stroke={hasVoted[postId] ? '#3b82f6' : 'currentColor'}
+                              />
                             </Button>
                             <Button
                               variant="outline"
@@ -381,6 +435,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               toast({ title: message });
                               if (success) {
                                 setVoteOpen((prev) => ({ ...prev, [postId]: false }));
+                                setHasVoted((prev) => ({ ...prev, [postId]: true }));
                               }
                             }
                           );
