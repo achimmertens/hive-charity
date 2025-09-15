@@ -235,7 +235,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                                 post.author,
                                 post.permlink,
                                 100,
-                                (success, message) => {
+                                (_, message) => {
                                   setVoting((prev) => ({ ...prev, [postId]: false }));
                                   toast(message);
                                 }
