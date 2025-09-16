@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessagesSquare, ExternalLink, DollarSign, Vote, Brain, AlertTriangle, User, Calendar, Tag, ThumbsUp } from "lucide-react";
+import { ExternalLink, Brain, AlertTriangle, User, Calendar, Tag, ThumbsUp } from "lucide-react";
 import { HivePost } from '@/services/hivePost';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
