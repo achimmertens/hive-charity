@@ -43,7 +43,10 @@ export const CharityAnalysisDisplay: React.FC<CharityAnalysisProps> = ({ analysi
           <span className="flex items-center gap-2">
             Charity Score: {analysis.charyScore}/10
             {analysis.isMock && (
-              <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Mock</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 font-medium flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1"></span>
+                Mock
+              </span>
             )}
           </span>
           <AlertCircle className={`h-6 w-6 ${analysis.charyScore >= 7 ? 'text-green-500' : analysis.charyScore >= 4 ? 'text-yellow-500' : 'text-red-500'}`} />
