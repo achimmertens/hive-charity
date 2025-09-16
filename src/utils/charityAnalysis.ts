@@ -1,16 +1,69 @@
 import { HivePost } from "@/services/hivePost";
 import { supabase } from "@/integrations/supabase/client";
 
+// Helper-Funktion für das Warten
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry-Konfiguration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelay: 1000, // 1 Sekunde
+  maxDelay: 10000 // 10 Sekunden
+};
+
+// Rate Limiting Konfiguration
+const RATE_LIMIT = {
+  maxRequests: 3, // Maximale Anzahl von Anfragen
+  timeWindow: 60000, // Zeitfenster in Millisekunden (1 Minute)
+  requests: [] as number[] // Zeitstempel der Anfragen
+};
+
+// Cache Konfiguration
+const ANALYSIS_CACHE = new Map<string, {
+  analysis: CharityAnalysis;
+  timestamp: number;
+}>();
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 Stunden in Millisekunden
+
 export interface CharityAnalysis {
   charyScore: number;
   summary: string;
   isMock?: boolean;
 }
 
+function checkRateLimit(): boolean {
+  const now = Date.now();
+  // Entferne alte Anfragen außerhalb des Zeitfensters
+  RATE_LIMIT.requests = RATE_LIMIT.requests.filter(
+    timestamp => now - timestamp < RATE_LIMIT.timeWindow
+  );
+  // Prüfe, ob noch Anfragen möglich sind
+  return RATE_LIMIT.requests.length < RATE_LIMIT.maxRequests;
+}
+
 export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysis> {
   try {
     console.log('Analyzing post:', post.title);
     console.log('Author reputation:', post.author_reputation);
+
+    // Erstelle einen Cache-Key aus Autor und Permlink
+    const cacheKey = `${post.author}/${post.permlink}`;
+
+    // Prüfe Cache
+    const cachedResult = ANALYSIS_CACHE.get(cacheKey);
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_DURATION) {
+      console.log('Using cached analysis for:', post.title);
+      return cachedResult.analysis;
+    }
+
+    // Prüfe Rate Limit bevor wir die Analyse starten
+    if (!checkRateLimit()) {
+      console.warn('Rate limit reached, using fallback analysis');
+      return generateMockAnalysis(post.body);
+    }
+    
+    // Füge aktuelle Anfrage zum Rate Limiting hinzu
+    RATE_LIMIT.requests.push(Date.now());
     
     // Use the full content of the post
     const postContent = post.body;
@@ -36,10 +89,40 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       } catch (e) {
         console.warn('Could not load src/charityExamples.txt on client:', e);
       }
-      // Use Supabase client to call the edge function
-      const { data, error } = await supabase.functions.invoke('analyze-charity', {
-        body: JSON.stringify({ ...requestPayload, prompt: promptFromClient }),
-      });
+      // Use Supabase client to call the edge function with retry logic
+      let data, error;
+      for (let retryCount = 0; retryCount <= RETRY_CONFIG.maxRetries; retryCount++) {
+        try {
+          if (retryCount > 0) {
+            // Exponential Backoff: 1s, 2s, 4s, ...
+            const delayTime = Math.min(
+              RETRY_CONFIG.initialDelay * Math.pow(2, retryCount - 1),
+              RETRY_CONFIG.maxDelay
+            );
+            console.log(`Retry attempt ${retryCount}, waiting ${delayTime}ms...`);
+            await delay(delayTime);
+          }
+
+          const response = await supabase.functions.invoke('analyze-charity', {
+            body: JSON.stringify({ ...requestPayload, prompt: promptFromClient }),
+          });
+          
+          data = response.data;
+          error = response.error;
+
+          // Wenn kein Fehler auftritt, brechen wir die Retry-Schleife ab
+          if (!error || !error.message?.includes('429')) {
+            break;
+          }
+        } catch (err) {
+          error = err;
+          console.warn(`Retry attempt ${retryCount + 1} failed:`, err);
+          // Weitermachen mit der nächsten Iteration, falls noch Versuche übrig sind
+          if (retryCount < RETRY_CONFIG.maxRetries) {
+            continue;
+          }
+        }
+      }
       
       if (error) {
         console.error('Edge function error:', error);
@@ -95,11 +178,19 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         console.log('Successfully saved to database (upsert)');
       }
       
-      return {
+      const analysis = {
         charyScore: typeof data.score === 'number' ? data.score : 0,
         summary: data.summary || "Keine klare Analyse verfügbar.",
         isMock: false
       };
+
+      // Speichere Analyse im Cache
+      ANALYSIS_CACHE.set(cacheKey, {
+        analysis,
+        timestamp: Date.now()
+      });
+      
+      return analysis;
       
     } catch (error) {
       console.error('Edge function request failed:', error);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { AlertTriangle, Calendar, ExternalLink, Tag, User, ThumbsUp } from "lucide-react";
+import { AlertTriangle, Brain, Calendar, ExternalLink, Tag, User, ThumbsUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { HivePost, fetchCharityPosts } from "@/services/hivePost";
 import { supabase } from "@/integrations/supabase/client";
@@ -307,6 +307,51 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               aria-label="Ansehen"
                             >
                               <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={async () => {
+                                try {
+                                  if (!post) return;
+                                  // Setze den Analysezustand auf null um zu zeigen, dass die Analyse läuft
+                                  setAnalyses(prev => ({
+                                    ...prev,
+                                    [`${post.author}/${post.permlink}`]: null
+                                  }));
+                                  const res = await analyzeCharityPost(post);
+                                  setAnalyses(prev => ({
+                                    ...prev,
+                                    [`${post.author}/${post.permlink}`]: res
+                                  }));
+                                  toast({ 
+                                    title: "Analyse abgeschlossen",
+                                    description: `Chary-Score: ${res.charyScore}/10`
+                                  });
+                                } catch (error) {
+                                  console.error('Analyse fehlgeschlagen:', error);
+                                  toast({ 
+                                    title: "Analyse fehlgeschlagen",
+                                    description: String(error),
+                                    variant: "destructive"
+                                  });
+                                  // Setze den Analysezustand zurück
+                                  // Setze den Analysezustand auf ein leeres Objekt im Fehlerfall
+                                  const emptyAnalysis: CharityAnalysis = {
+                                    charyScore: 0,
+                                    summary: "Analyse fehlgeschlagen"
+                                  };
+                                  setAnalyses(prev => ({
+                                    ...prev,
+                                    [`${post.author}/${post.permlink}`]: emptyAnalysis
+                                  }));
+                                }
+                              }}
+                              disabled={analyses[postId] === null}
+                              title="KI-Analyse"
+                              aria-label="KI-Analyse"
+                            >
+                              <Brain className={`h-4 w-4 ${analyses[postId] === null ? 'animate-spin' : ''}`} />
                             </Button>
                             <Button
                               size="sm"

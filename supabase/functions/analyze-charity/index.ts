@@ -86,22 +86,53 @@ serve(async (req) => {
       console.log('Using API key with first 5 chars:', OPENAI_API_KEY.substring(0, 5) + '...');
       const model = 'gpt-4o-mini';
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
-          ],
-          max_tokens: 500,
-          temperature: 0.3
-        }),
-      });
+      try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 25000); // 25 Sekunden Timeout
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
+            ],
+            max_tokens: 500,
+            temperature: 0.3
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          const status = response.status;
+          console.error(`OpenAI API error: ${status} ${errorText}`);
+          
+          // Spezifische Fehlermeldungen für verschiedene HTTP-Statuscodes
+          if (status === 429) {
+            return new Response(
+              JSON.stringify({
+                error: true,
+                message: 'Rate limit reached. Please try again in a few minutes.',
+                retryAfter: response.headers.get('Retry-After') || '60'
+              }),
+              {
+                status: 429,
+                headers: {
+                  ...corsHeaders,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+          }
 
       if (!response.ok) {
         const errorText = await response.text();

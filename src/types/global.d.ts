@@ -11,5 +11,11 @@ declare global {
   }
 }
 
+interface CharityAnalysis {
+  isCharity: boolean;
+  explanation: string;
+  confidence: number;
+}
+
 // Default Export, um TypeScript-Fehler zu vermeiden
 export default {};
