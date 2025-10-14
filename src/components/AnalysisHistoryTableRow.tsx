@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { ExternalLink } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type Analysis = {
   id: string;
@@ -37,8 +39,11 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
   isFavorite,
   isArchived
 }) => {
+  const [open, setOpen] = useState(false);
+
   return (
-    <TableRow key={analysis.id}>
+    <>
+      <TableRow key={analysis.id}>
       <TableCell>
         {onToggleChary ? (
           <Checkbox 
@@ -70,9 +75,13 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
       </TableCell>
       <TableCell>{analysis.charity_score}</TableCell>
           <TableCell>
-            <div className="text-sm text-gray-700 max-w-xs line-clamp-3">
+            <button
+              className="text-sm text-left text-gray-700 max-w-xs line-clamp-3 hover:underline"
+              onClick={() => setOpen(true)}
+              aria-label="Vollständige Analyse anzeigen"
+            >
               {analysis.openai_response ? analysis.openai_response : 'Keine Analyse verfügbar.'}
-            </div>
+            </button>
           </TableCell>
       <TableCell>
         <a
@@ -115,8 +124,45 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
           )}
         </div>
       </TableCell>
-    </TableRow>
+      </TableRow>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Analyse: {analysis.title || getShortTitle(analysis.article_url)}</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            <div className="text-sm text-gray-600 mb-2">
+              <strong>Charity-Score:</strong> {analysis.charity_score}
+              {analysis.analyzed_at && (
+                <span className="ml-4">• Analysiert: {format(new Date(analysis.analyzed_at), 'PPp', { locale: de })}</span>
+              )}
+            </div>
+            <div className="prose max-w-none whitespace-pre-wrap text-sm text-gray-800">
+              {analysis.openai_response || 'Keine Analyse verfügbar.'}
+            </div>
+            <div className="mt-4 text-sm">
+              <a href={analysis.article_url} target="_blank" rel="noopener noreferrer" className="text-hive hover:underline inline-flex items-center gap-1">
+                <ExternalLink className="h-4 w-4" /> Beitrag öffnen
+              </a>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Schließen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
+
+// Helper to get short title from URL when title is missing
+function getShortTitle(url: string) {
+  if (!url) return 'Artikel';
+  const match = url.match(/\/@[^\/]+\/(.*)$/);
+  return match && match[1] ? decodeURIComponent(match[1]) : url;
+}
 
 export default AnalysisHistoryTableRow;
