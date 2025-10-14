@@ -146,8 +146,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       } else {
         console.warn('Edge Function did not include model info.');
       }
-      // Store the analysis result in the database
-      // Always upsert (insert or update) so every scanned article appears in the history
+      
+      // Store the analysis result in the database (only for real analyses, not mocks)
       const analysisData = {
         article_url: `https://peakd.com/@${post.author}/${post.permlink}`,
         author_name: post.author,
@@ -158,24 +158,23 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         author_reputation: post.author_reputation,
         analyzed_at: new Date().toISOString(),
         title: post.title,
-        archived: false, // ensure new analyses are not archived
-        is_favorite: false // standardmäßig nicht als Favorit markiert
+        archived: false,
+        is_favorite: false
       };
 
-      console.log('Saving to database (upsert):', analysisData);
-      // Use upsert to ensure every scanned article appears only once, updated if re-scanned
+      console.log('Saving real analysis to database (upsert):', analysisData);
       const { error: upsertError } = await supabase
         .from('charity_analysis_results')
         .upsert([analysisData], { 
           onConflict: 'article_url',
-          ignoreDuplicates: false // Bestehende Einträge aktualisieren
+          ignoreDuplicates: false
         });
 
       if (upsertError) {
         console.error('Error storing analysis result:', upsertError);
-        throw upsertError; // Fehler weiterwerfen, damit die UI reagieren kann
+        throw upsertError;
       } else {
-        console.log('Successfully saved to database (upsert)');
+        console.log('Successfully saved real analysis to database');
       }
       
       const analysis = {
