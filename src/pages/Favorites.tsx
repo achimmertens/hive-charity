@@ -47,7 +47,7 @@ const Favorites = () => {
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
   const [archiveMap] = useState<Record<string, boolean>>({});
 
-  // Fetch favorited analyses that are not archived
+  // Fetch favorited analyses (include archived ones so favorites set in Archive also show up)
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['favoriteAnalyses'],
     queryFn: async () => {
@@ -55,7 +55,6 @@ const Favorites = () => {
         .from('charity_analysis_results')
         .select('*')
         .eq('is_favorite', true)
-        .eq('archived', false)
         .order('analyzed_at', { ascending: false });
       
       if (error) {
@@ -178,8 +177,10 @@ const Favorites = () => {
             <AlertTriangle className="h-10 w-10 text-amber-500 mb-4" />
             <h3 className="text-xl font-bold mb-2">Keine Favoriten vorhanden</h3>
             <p>
-              Sie haben noch keine Favoriten markiert. Gehen Sie zur Analyse-Historie Seite,
-              um Artikel als Favoriten zu markieren.
+              Es wurden keine Favoriten gefunden. Favoriten können in der Analyse-Historie
+              oder im Archiv markiert werden (Spalte „Favorit“). Wenn Sie Beiträge als Favoriten
+              markiert haben, stellen Sie bitte sicher, dass die Synchronisation mit der Datenbank
+              funktioniert oder aktualisieren Sie die Seite.
             </p>
           </div>
         </Card>

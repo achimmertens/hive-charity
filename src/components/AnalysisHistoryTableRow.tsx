@@ -69,6 +69,11 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
         )}
       </TableCell>
       <TableCell>{analysis.charity_score}</TableCell>
+          <TableCell>
+            <div className="text-sm text-gray-700 max-w-xs line-clamp-3">
+              {analysis.openai_response ? analysis.openai_response : 'Keine Analyse verfügbar.'}
+            </div>
+          </TableCell>
       <TableCell>
         <a
           href={`https://peakd.com/@${analysis.author_name}`}

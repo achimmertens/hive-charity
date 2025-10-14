@@ -45,6 +45,7 @@ const AnalysisHistoryTable: React.FC<Props> = ({
           <TableHead>Favorit</TableHead>
           <TableHead>Archiv</TableHead>
           <TableHead>Charity-Score</TableHead>
+          <TableHead>Analyse</TableHead>
           {columns.map((col) => (
             <SortableTableHeader
               key={col.key}
