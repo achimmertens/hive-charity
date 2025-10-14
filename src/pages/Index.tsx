@@ -73,6 +73,26 @@ const Index: React.FC<IndexProps> = ({ user, setUser }) => {
         title: "CharityCheck abgeschlossen",
         description: `Score: ${result.charyScore}/10 - ${result.summary}`,
       });
+
+      try {
+        // Persist the analysis in the same shape localStorage uses so NewPostsScanner can pick it up
+        const existingRaw = localStorage.getItem('currentCharityPostsV1');
+        const existingList: { post: any; analysis: any }[] = existingRaw ? JSON.parse(existingRaw) : [];
+        const newEntry = { post: hivePost, analysis: { charyScore: result.charyScore, summary: result.summary } };
+        // Put newest first and dedupe by author/permlink
+        const combined = [newEntry, ...existingList];
+        const dedup = new Map<string, { post: any; analysis: any }>();
+        for (const item of combined) {
+          dedup.set(`${item.post.author}/${item.post.permlink}`, item);
+        }
+        const persisted = Array.from(dedup.values()).slice(0, 20);
+        localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
+
+        // Dispatch a custom event so NewPostsScanner can update immediately
+        window.dispatchEvent(new CustomEvent('charity:new-analysis', { detail: newEntry }));
+      } catch (e) {
+        console.warn('Failed to persist manual analysis to localStorage:', e);
+      }
     } catch (err) {
       toast({ title: "Fehler bei CharityCheck", description: String(err), variant: "destructive" });
     }

@@ -97,6 +97,45 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
     } catch (e) {
       console.warn('Failed to restore current posts', e);
     }
+    
+    // Listen for manual analyses added from other parts of the app (Index)
+    const handler = (ev: Event) => {
+      try {
+        // @ts-ignore
+        const detail = ev.detail as { post: HivePost; analysis: CharityAnalysis };
+        if (!detail || !detail.post) return;
+        const key = `${detail.post.author}/${detail.post.permlink}`;
+
+        setAnalyses(prev => ({ ...prev, [key]: detail.analysis }));
+        setPosts(prev => {
+          // Dedupe
+          const exists = prev.some(p => `${p.author}/${p.permlink}` === key);
+          if (exists) return prev;
+          const next = [detail.post, ...prev].slice(0, maxShown);
+          return next;
+        });
+
+        // Update persisted storage
+        try {
+          const raw = localStorage.getItem('currentCharityPostsV1');
+          const list = raw ? JSON.parse(raw) as any[] : [];
+          const dedup = new Map<string, any>();
+          dedup.set(key, { post: detail.post, analysis: detail.analysis });
+          for (const item of list) {
+            dedup.set(`${item.post.author}/${item.post.permlink}`, item);
+          }
+          const persisted = Array.from(dedup.values()).slice(0, maxShown);
+          localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
+        } catch (e) {
+          console.warn('Failed to update currentCharityPostsV1 after new analysis', e);
+        }
+      } catch (e) {
+        console.warn('Invalid charity:new-analysis event', e);
+      }
+    };
+
+    window.addEventListener('charity:new-analysis', handler as EventListener);
+    return () => window.removeEventListener('charity:new-analysis', handler as EventListener);
   }, [user?.username]);
 
   const handleScan = async () => {
