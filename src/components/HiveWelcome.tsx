@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { HiveUser } from "@/services/hiveAuth";
-import CharityPostsEnhanced from './CharityPostsEnhanced';
+// ...CharityPostsEnhanced removed: NewPostsScanner now provides the unified list
 import NewPostsScanner from './NewPostsScanner';
 
 interface HiveWelcomeProps {
@@ -21,12 +21,8 @@ const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user }) => {
       </div>
 
       <div className="max-w-4xl mx-auto">
-        {/* Neue Beiträge suchen Button und Ergebnisliste */}
+        {/* Neue Beiträge suchen Button und einheitliche Ergebnisliste (NewPostsScanner zeigt bis zu 30 Einträge, newest-first) */}
         <NewPostsScanner user={user} />
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-6">Aktuelle Charity-Beiträge</h2>
-          <CharityPostsEnhanced user={user} />
-        </div>
       </div>
     </div>
   );

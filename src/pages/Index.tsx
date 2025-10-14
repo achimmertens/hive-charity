@@ -83,7 +83,8 @@ const Index: React.FC<IndexProps> = ({ user, setUser }) => {
         const combined = [newEntry, ...existingList];
         const dedup = new Map<string, { post: any; analysis: any }>();
         for (const item of combined) {
-          dedup.set(`${item.post.author}/${item.post.permlink}`, item);
+          const k = `${item.post.author}/${item.post.permlink}`;
+          if (!dedup.has(k)) dedup.set(k, item);
         }
         const persisted = Array.from(dedup.values()).slice(0, 20);
         localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));

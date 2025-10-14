@@ -33,7 +33,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [voteValue, setVoteValue] = useState<Record<string, number>>({});
   const [voting, setVoting] = useState<Record<string, boolean>>({});
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
-  const maxShown = 20;
+  const maxShown = 30;
 
   // Check if user has voted on posts
   const checkVoteStatus = async (posts: HivePost[], username: string) => {
@@ -108,10 +108,9 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
 
         setAnalyses(prev => ({ ...prev, [key]: detail.analysis }));
         setPosts(prev => {
-          // Dedupe
-          const exists = prev.some(p => `${p.author}/${p.permlink}` === key);
-          if (exists) return prev;
-          const next = [detail.post, ...prev].slice(0, maxShown);
+          // Move manual/last searched entry to the top. If already present, remove old occurrence first.
+          const filtered = prev.filter(p => `${p.author}/${p.permlink}` !== key);
+          const next = [detail.post, ...filtered].slice(0, maxShown);
           return next;
         });
 
@@ -119,10 +118,12 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         try {
           const raw = localStorage.getItem('currentCharityPostsV1');
           const list = raw ? JSON.parse(raw) as any[] : [];
+          // Ensure newest-first with manual entry on top, and dedupe preferring newest
+          const combined = [{ post: detail.post, analysis: detail.analysis }, ...(list || [])];
           const dedup = new Map<string, any>();
-          dedup.set(key, { post: detail.post, analysis: detail.analysis });
-          for (const item of list) {
-            dedup.set(`${item.post.author}/${item.post.permlink}`, item);
+          for (const item of combined) {
+            const k = `${item.post.author}/${item.post.permlink}`;
+            if (!dedup.has(k)) dedup.set(k, item);
           }
           const persisted = Array.from(dedup.values()).slice(0, maxShown);
           localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
@@ -170,11 +171,12 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         return;
       }
 
-      setPosts(newOnes);
-      // set loading placeholders
+  // Only add new posts that are not already present in state/localStorage
+  // We'll merge new ones in front of existing posts, preserving newest-first order
+  // set loading placeholders
       const initial: Record<string, CharityAnalysis | null> = {};
       newOnes.forEach(p => { initial[`${p.author}/${p.permlink}`] = null; });
-      setAnalyses(prev => ({ ...prev, ...initial }));
+  setAnalyses(prev => ({ ...prev, ...initial }));
 
       // Analyze in parallel
       const results = await Promise.all(newOnes.map(async (post) => {
@@ -190,19 +192,29 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       const finalAnalyses: Record<string, CharityAnalysis | null> = { ...analyses };
       results.forEach(r => { finalAnalyses[r.key] = r.res; });
 
-      // Persist and limit to maxShown, newest first
+      // Persist and limit to maxShown, newest first. Keep newest items when deduping.
       const existingRaw = localStorage.getItem('currentCharityPostsV1');
       const existingList: { post: HivePost; analysis: CharityAnalysis }[] = existingRaw ? JSON.parse(existingRaw) : [];
-      const combined = [...results.map(r => ({ post: r.post, analysis: r.res })), ...existingList];
+      const newEntries = results.map(r => ({ post: r.post, analysis: r.res }));
+      const combined = [...newEntries, ...existingList]; // newest-first
       const dedupMap = new Map<string, { post: HivePost; analysis: CharityAnalysis }>();
       for (const item of combined) {
-        dedupMap.set(`${item.post.author}/${item.post.permlink}`, item);
+        const key = `${item.post.author}/${item.post.permlink}`;
+        if (!dedupMap.has(key)) {
+          dedupMap.set(key, item);
+        }
       }
       const persisted = Array.from(dedupMap.values()).slice(0, maxShown);
       localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
 
       setAnalyses(finalAnalyses);
-      setPosts(persisted.map(p => p.post));
+      // Merge into current posts state: add new entries that don't already exist, newest-first
+      setPosts(prevPosts => {
+        const existingKeys = new Set(prevPosts.map(p => `${p.author}/${p.permlink}`));
+        const toAdd = persisted.map(p => p.post).filter(p => !existingKeys.has(`${p.author}/${p.permlink}`));
+        const merged = [...toAdd, ...prevPosts].slice(0, maxShown);
+        return merged;
+      });
 
       // Check vote status for new posts
       if (user?.username) {
