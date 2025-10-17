@@ -45,6 +45,7 @@ const Favorites = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
+  const [manualCharyMap, setManualCharyMap] = useState<Record<string, boolean>>({});
 
   // Fetch favorited analyses (include archived ones so favorites set in Archive also show up)
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
@@ -85,7 +86,10 @@ const Favorites = () => {
       : descendingComparator(a, b, sortKey)
   );
 
-  const charyMap = useCharyInComments(sortedAnalyses);
+  const apiCharyMap = useCharyInComments(sortedAnalyses);
+  
+  // Merge API chary data with manual changes
+  const charyMap = { ...apiCharyMap, ...manualCharyMap };
 
   const handleSort = (key: string) => {
     if (key === sortKey) {
@@ -119,6 +123,18 @@ const Favorites = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleToggleChary = async (_analysisId: string, postId: string, value: boolean) => {
+    setManualCharyMap(prev => ({
+      ...prev,
+      [postId]: value
+    }));
+    
+    toast({
+      title: value ? "!CHARY markiert" : "!CHARY entfernt",
+      description: `Der Artikel wurde als ${value ? '!CHARY markiert' : '!CHARY entfernt'}.`,
+    });
   };
 
 
@@ -176,6 +192,7 @@ const Favorites = () => {
             sortDirection={sortDirection}
             onSort={handleSort}
             onToggleFavorite={handleToggleFavorite}
+            onToggleChary={handleToggleChary}
             favoriteMap={favoriteMap}
           />
         </div>

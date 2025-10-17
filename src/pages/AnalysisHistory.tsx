@@ -42,6 +42,7 @@ const AnalysisHistory = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
   const [selectedForFavorites, setSelectedForFavorites] = useState<string[]>([]);
+  const [manualCharyMap, setManualCharyMap] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const { toast } = useToast();
@@ -110,7 +111,10 @@ const AnalysisHistory = () => {
     fetchFavorites();
   }, []);
 
-  const charyMap = useCharyInComments(analyses);
+  const apiCharyMap = useCharyInComments(analyses);
+  
+  // Merge API chary data with manual changes
+  const charyMap = { ...apiCharyMap, ...manualCharyMap };
 
   const handleSort = (key: string) => {
     if (key === sortKey) {
@@ -176,9 +180,10 @@ const AnalysisHistory = () => {
   };
 
   const handleToggleChary = async (_analysisId: string, postId: string, value: boolean) => {
-    // This is just for UI update, actual functionality would require API integration
-    const newCharyMap = { ...charyMap };
-    newCharyMap[postId] = value;
+    setManualCharyMap(prev => ({
+      ...prev,
+      [postId]: value
+    }));
     
     toast({
       title: value ? "!CHARY markiert" : "!CHARY entfernt",
