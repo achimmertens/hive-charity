@@ -62,7 +62,6 @@ serve(async (req) => {
     console.log('Content length:', content.length);
 
     // Prepare the prompt for OpenAI
-    // Priority: client-provided prompt, then local file
     let charityPrompt = '';
     if (prompt && typeof prompt === 'string' && prompt.trim().length > 0) {
       charityPrompt = prompt;
@@ -73,74 +72,66 @@ serve(async (req) => {
         console.log('Loaded prompt from function folder (charityExamples.txt)');
       } catch (err) {
         console.error('Could not read charityExamples.txt:', err);
-        // Continue with a minimal system prompt instead of failing hard
         charityPrompt = 'You are a charity content evaluator. Score from 0-10 and summarize.';
       }
     }
-    // Compose the full prompt for OpenAI
+    
     const systemPrompt = `${charityPrompt}\n\nAnalyze the following Hive blog post according to the instructions and examples above. Return your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
 
+    // Call OpenAI API
+    console.log('Sending request to OpenAI API...');
+    const model = 'gpt-4o-mini';
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+
     try {
-      // Call OpenAI API
-      console.log('Sending request to OpenAI API...');
-      console.log('Using API key with first 5 chars:', OPENAI_API_KEY.substring(0, 5) + '...');
-      const model = 'gpt-4o-mini';
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
+          ],
+          max_tokens: 500,
+          temperature: 0.3
+        }),
+        signal: controller.signal
+      });
 
-      try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000); // 25 Sekunden Timeout
-
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
-            ],
-            max_tokens: 500,
-            temperature: 0.3
-          }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          const status = response.status;
-          console.error(`OpenAI API error: ${status} ${errorText}`);
-          
-          // Spezifische Fehlermeldungen für verschiedene HTTP-Statuscodes
-          if (status === 429) {
-            return new Response(
-              JSON.stringify({
-                error: true,
-                message: 'Rate limit reached. Please try again in a few minutes.',
-                retryAfter: response.headers.get('Retry-After') || '60'
-              }),
-              {
-                status: 429,
-                headers: {
-                  ...corsHeaders,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-          }
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`OpenAI API error: ${response.status} ${errorText}`);
+        const status = response.status;
+        console.error(`OpenAI API error: ${status} ${errorText}`);
+        
+        if (status === 429) {
+          return new Response(
+            JSON.stringify({
+              error: true,
+              message: 'Rate limit reached. Please try again in a few minutes.',
+              retryAfter: response.headers.get('Retry-After') || '60'
+            }),
+            {
+              status: 429,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
         return new Response(
           JSON.stringify({
             error: true,
-            message: `OpenAI API error: ${response.status}`,
+            message: `OpenAI API error: ${status}`,
             score: 0,
             summary: 'Fehler bei der Verbindung zum Analyse-Dienst. Bitte versuchen Sie es später erneut.'
           }),
@@ -156,36 +147,13 @@ serve(async (req) => {
 
       const data = await response.json();
       console.log('OpenAI API response received');
-      console.log('OpenAI model used:', model);
-      try {
-        console.log('OpenAI raw choice snippet:', JSON.stringify(data?.choices?.[0], null, 2));
-      } catch (_) {}
 
-      // OpenAI response parsing
+      // Parse OpenAI response
       let answer = "";
-      try {
-        if (data && data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-          answer = data.choices[0].message.content;
-        } else {
-          throw new Error("OpenAI response missing choices or content");
-        }
-      } catch (e) {
-        console.error('Failed to parse OpenAI response:', e);
-        return new Response(
-          JSON.stringify({
-            error: true,
-            message: 'Fehler beim Parsen der OpenAI-Antwort.',
-            score: 0,
-            summary: 'Fehler beim Parsen der OpenAI-Antwort.'
-          }),
-          {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+      if (data?.choices?.[0]?.message?.content) {
+        answer = data.choices[0].message.content;
+      } else {
+        throw new Error("OpenAI response missing choices or content");
       }
 
       let result;
@@ -194,34 +162,29 @@ serve(async (req) => {
         console.log('Successfully parsed JSON response from OpenAI');
       } catch (error) {
         console.log('Failed to parse JSON response from OpenAI, extracting manually');
-        // Extract the score (looking for a number from 0-10)
         const scoreMatch = answer.match(/score['"]?\s*:\s*([0-9]|10)/i);
         const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
-        // Extract the summary (anything in quotes after "summary")
+        
         let summaryMatch = answer.match(/summary['"]?\s*:\s*['"]([^'"]+)['"]/i);
         let summary = "";
-        if (summaryMatch && summaryMatch[1]) {
+        if (summaryMatch?.[1]) {
           summary = summaryMatch[1];
         } else {
-          // Try to find any paragraph that might be the summary
           const paragraphs = answer.split('\n').filter(p => p.trim().length > 0);
           const found = paragraphs.find(p => p.trim().length > 20 && !p.includes('score'));
           summary = found || "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
         }
         result = { score, summary };
-        console.log('Manually extracted result from OpenAI:', result);
       }
 
-      // Validate that we have a score and summary
+      // Validate result
       if (!result.score && result.score !== 0) {
         result.score = 0;
       }
       if (!result.summary) {
         result.summary = "Keine klare Analyse verfügbar.";
       }
-      console.log('Final analysis result from OpenAI:', result);
 
-      // Return the final result
       return new Response(
         JSON.stringify({
           score: result.score,
@@ -236,7 +199,8 @@ serve(async (req) => {
         }
       );
       
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeout);
       console.error('OpenAI API request error:', error);
       
       return new Response(
@@ -247,7 +211,7 @@ serve(async (req) => {
           summary: 'Fehler bei der Analyse. Bitte versuchen Sie es später erneut.'
         }),
         { 
-          status: 200, // Return 200 so client can handle this gracefully
+          status: 200,
           headers: { 
             ...corsHeaders,
             'Content-Type': 'application/json' 
@@ -267,7 +231,7 @@ serve(async (req) => {
         summary: `Fehler bei der Analyse: ${error.message}`
       }),
       { 
-        status: 200, // Returning 200 even for errors to ensure client can process them
+        status: 200,
         headers: { 
           ...corsHeaders,
           'Content-Type': 'application/json' 
