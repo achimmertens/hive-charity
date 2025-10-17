@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { analyzeCharityPost, CharityAnalysis } from "@/utils/charityAnalysis";
 import { CharityAnalysisDisplay } from "./CharityAnalysis";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,8 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<HivePost[]>([]);
   const [analyses, setAnalyses] = useState<Record<string, CharityAnalysis | null>>({});
+  const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
+  const [charyMap, setCharyMap] = useState<Record<string, boolean>>({});
   const [ranOnce, setRanOnce] = useState(false);
   const [replyOpen, setReplyOpen] = useState<Record<string, boolean>>({});
   const [replyText, setReplyText] = useState<Record<string, string>>({});
@@ -34,6 +37,71 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [voting, setVoting] = useState<Record<string, boolean>>({});
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
   const maxShown = 30;
+
+  // Load favorite flags for currently displayed posts from Supabase
+  React.useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        if (!posts || posts.length === 0) return;
+        const urls = posts.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
+        const { data } = await supabase
+          .from('charity_analysis_results')
+          .select('article_url, is_favorite')
+          .in('article_url', urls as string[]);
+
+        const favMap: Record<string, boolean> = {};
+        (data || []).forEach((row: any) => {
+          const match = row.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
+          if (match) {
+            favMap[`${match[1]}/${match[2]}`] = !!row.is_favorite;
+          }
+        });
+        setFavoriteMap(favMap);
+      } catch (e) {
+        console.warn('Failed to load favorite flags for visible posts', e);
+      }
+    };
+
+    loadFavorites();
+  }, [posts]);
+
+  const handleToggleFavorite = async (post: HivePost, value: boolean) => {
+    const postUrl = `https://peakd.com/@${post.author}/${post.permlink}`;
+    try {
+      // Check if an analysis record exists for this article
+      const { data: existing } = await supabase
+        .from('charity_analysis_results')
+        .select('id')
+        .eq('article_url', postUrl)
+        .single();
+
+      if (!existing) {
+        toast({ title: 'Analyse fehlt', description: 'Bitte analysiere den Artikel zuerst, damit er in der Historie gespeichert wird und als Favorit markiert werden kann.' });
+        // revert UI state
+        setFavoriteMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: false }));
+        return;
+      }
+
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ is_favorite: value })
+        .eq('article_url', postUrl);
+
+      if (error) throw error;
+
+      setFavoriteMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: value }));
+      toast({ title: value ? 'Als Favorit markiert' : 'Aus Favoriten entfernt' });
+    } catch (e) {
+      console.error('Failed to toggle favorite:', e);
+      toast({ title: 'Fehler', description: 'Favorit konnte nicht gesetzt werden.', variant: 'destructive' });
+      setFavoriteMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: !value }));
+    }
+  };
+
+  const handleToggleChary = (postId: string, value: boolean) => {
+    setCharyMap(prev => ({ ...prev, [postId]: value }));
+    toast({ title: value ? '!CHARY markiert' : '!CHARY entfernt' });
+  };
 
   // Check if user has voted on posts
   const checkVoteStatus = async (posts: HivePost[], username: string) => {
@@ -317,6 +385,23 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               {post.community_title || post.community}
                             </Badge>
                           )}
+                        </div>
+                        {/* !CHARY + Favorit checkboxes (appear under tags) */}
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={!!charyMap[postId]}
+                              onCheckedChange={(val) => handleToggleChary(postId, !!val)}
+                            />
+                            <span className="text-sm text-gray-700">!CHARY</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={!!favoriteMap[postId]}
+                              onCheckedChange={(val) => handleToggleFavorite(post, !!val)}
+                            />
+                            <span className="text-sm text-gray-700">Favorit</span>
+                          </div>
                         </div>
                       </CardContent>
                       <CardFooter className="p-0 flex justify-between items-center">
