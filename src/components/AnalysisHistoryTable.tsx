@@ -18,10 +18,8 @@ interface Props {
   onSort: (key: string) => void;
   onToggleChary?: (analysisId: string, postId: string, value: boolean) => void;
   onToggleFavorite?: (analysisId: string, value: boolean) => void;
-  onToggleArchive?: (analysisId: string, value: boolean) => void;
   favoriteMap: Record<string, boolean>;
-  archiveMap: Record<string, boolean>;
-  showArchiveButton?: boolean; // Optional prop für die Anzeige des Archiv-Buttons
+  archiveMap?: Record<string, boolean>;
 }
 
 const AnalysisHistoryTable: React.FC<Props> = ({
@@ -33,9 +31,7 @@ const AnalysisHistoryTable: React.FC<Props> = ({
   onSort,
   onToggleChary,
   onToggleFavorite,
-  onToggleArchive,
   favoriteMap,
-  archiveMap,
 }) => {
   return (
     <Table>
@@ -43,7 +39,6 @@ const AnalysisHistoryTable: React.FC<Props> = ({
         <TableRow>
           <TableHead>!CHARY</TableHead>
           <TableHead>Favorit</TableHead>
-          <TableHead>Archiv</TableHead>
           <TableHead>Charity-Score</TableHead>
           <TableHead>Analyse</TableHead>
           {columns.map((col) => (
@@ -73,10 +68,7 @@ const AnalysisHistoryTable: React.FC<Props> = ({
                 (value) => onToggleChary(analysis.id, charyKey, value) : undefined}
               onToggleFavorite={onToggleFavorite ? 
                 (value) => onToggleFavorite(analysis.id, value) : undefined}
-              onToggleArchive={onToggleArchive ? 
-                (value) => onToggleArchive(analysis.id, value) : undefined}
               isFavorite={!!favoriteMap[analysis.id]}
-              isArchived={!!archiveMap[analysis.id]}
             />
           );
         })}

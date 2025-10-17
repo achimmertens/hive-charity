@@ -256,7 +256,7 @@ serve(async (req) => {
       );
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in analyze-charity function:', error);
     
     return new Response(

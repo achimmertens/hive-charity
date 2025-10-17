@@ -41,8 +41,6 @@ const AnalysisHistory = () => {
   const [sortKey, setSortKey] = useState('analyzed_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
-  const [archiveMap, setArchiveMap] = useState<Record<string, boolean>>({});
-  const [selectedForArchiving, setSelectedForArchiving] = useState<string[]>([]);
   const [selectedForFavorites, setSelectedForFavorites] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
@@ -137,56 +135,7 @@ const AnalysisHistory = () => {
     }
   };
 
-  const handleToggleArchive = (analysisId: string, value: boolean) => {
-    setArchiveMap(prev => ({
-      ...prev,
-      [analysisId]: value
-    }));
-    
-    if (value) {
-      setSelectedForArchiving(prev => [...prev, analysisId]);
-    } else {
-      setSelectedForArchiving(prev => prev.filter(id => id !== analysisId));
-    }
-  };
 
-  const handleArchiveSelected = async () => {
-    if (selectedForArchiving.length === 0) {
-      toast({
-        title: "Keine Artikel ausgewählt",
-        description: "Bitte wählen Sie mindestens einen Artikel zum Archivieren aus.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('charity_analysis_results')
-        .update({ archived: true })
-        .in('id', selectedForArchiving);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Archiviert",
-        description: `${selectedForArchiving.length} Artikel wurden archiviert.`,
-      });
-      
-      // Reset state and refresh data
-      setSelectedForArchiving([]);
-      setArchiveMap({});
-      refetch();
-      
-    } catch (error) {
-      console.error('Error archiving articles:', error);
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Archivieren der Artikel.",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleFavoritesSelected = async () => {
     if (selectedForFavorites.length === 0) {
@@ -292,13 +241,6 @@ const AnalysisHistory = () => {
           >
             {selectedForFavorites.length > 0 ? `${selectedForFavorites.length} ` : ''}Favoriten hinzufügen
           </Button>
-          <Button 
-            onClick={handleArchiveSelected} 
-            className="bg-hive hover:bg-hive-dark"
-            disabled={selectedForArchiving.length === 0}
-          >
-            {selectedForArchiving.length > 0 ? `${selectedForArchiving.length} ` : ''}Artikel archivieren
-          </Button>
         </div>
       </div>
       <Card className="overflow-hidden">
@@ -311,11 +253,8 @@ const AnalysisHistory = () => {
             sortDirection={sortDirection}
             onSort={handleSort}
             onToggleFavorite={handleToggleFavorite}
-            onToggleArchive={handleToggleArchive}
             onToggleChary={handleToggleChary}
             favoriteMap={favoriteMap}
-            archiveMap={archiveMap}
-            showArchiveButton={selectedForArchiving.length > 0}
           />
         </div>
       </Card>

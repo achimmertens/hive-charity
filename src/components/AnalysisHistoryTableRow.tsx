@@ -25,9 +25,7 @@ interface Props {
   charyMark: boolean;
   onToggleChary?: (value: boolean) => void;
   onToggleFavorite?: (value: boolean) => void;
-  onToggleArchive?: (value: boolean) => void;
   isFavorite: boolean;
-  isArchived: boolean;
 }
 
 const AnalysisHistoryTableRow: React.FC<Props> = ({ 
@@ -35,9 +33,7 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
   charyMark, 
   onToggleChary,
   onToggleFavorite,
-  onToggleArchive,
-  isFavorite,
-  isArchived
+  isFavorite
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -60,15 +56,6 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
           <Checkbox 
             checked={isFavorite} 
             onCheckedChange={onToggleFavorite} 
-            className="ml-1" 
-          />
-        )}
-      </TableCell>
-      <TableCell>
-        {onToggleArchive && (
-          <Checkbox 
-            checked={isArchived} 
-            onCheckedChange={onToggleArchive} 
             className="ml-1" 
           />
         )}

@@ -45,7 +45,6 @@ const Favorites = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
   const [favoriteMap, setFavoriteMap] = useState<Record<string, boolean>>({});
-  const [archiveMap] = useState<Record<string, boolean>>({});
 
   // Fetch favorited analyses (include archived ones so favorites set in Archive also show up)
   const { data: analyses = [], isLoading, error, refetch } = useQuery({
@@ -122,30 +121,6 @@ const Favorites = () => {
     }
   };
 
-  const handleToggleArchive = async (analysisId: string, value: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('charity_analysis_results')
-        .update({ archived: value })
-        .eq('id', analysisId);
-      
-      if (error) throw error;
-      
-      toast({
-        title: value ? "Archiviert" : "Aus Archiv entfernt",
-        description: `Der Artikel wurde ${value ? 'archiviert' : 'aus dem Archiv entfernt'}.`,
-      });
-      
-      refetch();
-    } catch (error) {
-      console.error('Error updating archive status:', error);
-      toast({
-        title: "Fehler",
-        description: "Fehler beim Aktualisieren des Archivstatus.",
-        variant: "destructive"
-      });
-    }
-  };
 
   if (isLoading) {
     return (
@@ -201,9 +176,7 @@ const Favorites = () => {
             sortDirection={sortDirection}
             onSort={handleSort}
             onToggleFavorite={handleToggleFavorite}
-            onToggleArchive={handleToggleArchive}
             favoriteMap={favoriteMap}
-            archiveMap={archiveMap}
           />
         </div>
       </Card>
