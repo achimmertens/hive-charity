@@ -58,11 +58,11 @@ export type Database = {
           author_name: string
           author_reputation: number | null
           charity_score: number
-          chary_marked: boolean
           created_at: string
           id: string
           image_url: string | null
           is_favorite: boolean
+          chary_marked: boolean
           openai_response: string
           title: string | null
         }
@@ -73,11 +73,11 @@ export type Database = {
           author_name: string
           author_reputation?: number | null
           charity_score: number
-          chary_marked?: boolean
           created_at: string
           id?: string
           image_url?: string | null
           is_favorite?: boolean
+          chary_marked?: boolean
           openai_response: string
           title?: string | null
         }
@@ -88,11 +88,11 @@ export type Database = {
           author_name?: string
           author_reputation?: number | null
           charity_score?: number
-          chary_marked?: boolean
           created_at?: string
           id?: string
           image_url?: string | null
           is_favorite?: boolean
+          chary_marked?: boolean
           openai_response?: string
           title?: string | null
         }

@@ -159,7 +159,8 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         analyzed_at: new Date().toISOString(),
         title: post.title,
         archived: false,
-        is_favorite: false
+        is_favorite: false,
+        chary_marked: false
       };
 
       console.log('Saving real analysis to database (upsert):', analysisData);

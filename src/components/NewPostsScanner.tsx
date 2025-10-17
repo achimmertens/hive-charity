@@ -38,7 +38,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
   const maxShown = 30;
 
-  // Load favorite flags for currently displayed posts from Supabase
+  // Load favorite + chary flags for currently displayed posts from Supabase
   React.useEffect(() => {
     const loadFavorites = async () => {
       try {
@@ -46,17 +46,20 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         const urls = posts.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
         const { data } = await supabase
           .from('charity_analysis_results')
-          .select('article_url, is_favorite')
+          .select('article_url, is_favorite, chary_marked')
           .in('article_url', urls as string[]);
 
         const favMap: Record<string, boolean> = {};
+        const charyFlags: Record<string, boolean> = {};
         (data || []).forEach((row: any) => {
           const match = row.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
           if (match) {
             favMap[`${match[1]}/${match[2]}`] = !!row.is_favorite;
+            charyFlags[`${match[1]}/${match[2]}`] = !!row.chary_marked;
           }
         });
         setFavoriteMap(favMap);
+        setCharyMap(charyFlags);
       } catch (e) {
         console.warn('Failed to load favorite flags for visible posts', e);
       }
@@ -98,9 +101,37 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
     }
   };
 
-  const handleToggleChary = (postId: string, value: boolean) => {
-    setCharyMap(prev => ({ ...prev, [postId]: value }));
-    toast({ title: value ? '!CHARY markiert' : '!CHARY entfernt' });
+  const handleToggleChary = async (post: HivePost, value: boolean) => {
+    const postUrl = `https://peakd.com/@${post.author}/${post.permlink}`;
+    try {
+      // Check if an analysis record exists for this article
+      const { data: existing } = await supabase
+        .from('charity_analysis_results')
+        .select('id')
+        .eq('article_url', postUrl)
+        .single();
+
+      if (!existing) {
+        toast({ title: 'Analyse fehlt', description: 'Bitte analysiere den Artikel zuerst, damit er in der Historie gespeichert wird und als !CHARY markiert werden kann.' });
+        // revert UI state
+        setCharyMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: false }));
+        return;
+      }
+
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ chary_marked: value })
+        .eq('article_url', postUrl);
+
+      if (error) throw error;
+
+      setCharyMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: value }));
+      toast({ title: value ? '!CHARY markiert' : '!CHARY entfernt' });
+    } catch (e) {
+      console.error('Failed to toggle !CHARY:', e);
+      toast({ title: 'Fehler', description: '!CHARY konnte nicht gesetzt werden.', variant: 'destructive' });
+      setCharyMap(prev => ({ ...prev, [`${post.author}/${post.permlink}`]: !value }));
+    }
   };
 
   // Check if user has voted on posts
@@ -391,7 +422,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               checked={!!charyMap[postId]}
-                              onCheckedChange={(val) => handleToggleChary(postId, !!val)}
+                              onCheckedChange={(val) => handleToggleChary(post, !!val)}
                             />
                             <span className="text-sm text-gray-700">!CHARY</span>
                           </div>
