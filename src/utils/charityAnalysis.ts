@@ -147,13 +147,33 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
         console.warn('Edge Function did not include model info.');
       }
       
+      // Post-processing heuristics to improve reliability (keyword boosts / plan detection)
+      const lowered = (data.summary || "" + " " + data.model || "").toLowerCase();
+      const strongKeywords = [/gespendet/, /gesammelt/, /übergeben/, /verteilt/, /zahlung/, /paid/, /donat/, /raised/, /fundrais/];
+      const planKeywords = [/planen/, /wir wollen/, /werden kaufen/, /bitte helft/, /wollen nächste/, /planen, einen/];
+      let boost = 0;
+      try {
+        for (const rx of strongKeywords) if (rx.test(lowered)) boost += 3;
+        for (const rx of planKeywords) if (rx.test(lowered)) boost -= 2;
+      } catch (_) { /* ignore */ }
+
       // Store the analysis result in the database (only for real analyses, not mocks)
+      // Also store the structured response from the edge function if available
+      const structured = {
+        score: typeof data.score === 'number' ? data.score : (data.score ? Number(data.score) : 0),
+        summary: data.summary || '',
+        reason: data.reason || '',
+        evidence: data.evidence || []
+      };
+
+      const adjustedScore = Math.max(0, Math.min(10, Math.round((structured.score || 0) + boost)));
+
       const analysisData = {
         article_url: `https://peakd.com/@${post.author}/${post.permlink}`,
         author_name: post.author,
         created_at: post.created,
-        charity_score: data.score,
-        openai_response: data.summary,
+        charity_score: adjustedScore,
+        openai_response: JSON.stringify(structured),
         image_url: post.image_url,
         author_reputation: post.author_reputation,
         analyzed_at: new Date().toISOString(),

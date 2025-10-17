@@ -76,11 +76,11 @@ serve(async (req) => {
       }
     }
     
-    const systemPrompt = `${charityPrompt}\n\nAnalyze the following Hive blog post according to the instructions and examples above. Return your answer in JSON format with fields 'score' (number) and 'summary' (string).`;
+  const systemPrompt = `${charityPrompt}\n\nAnalyze the following Hive blog post according to the instructions and examples above. Return your answer in JSON format with the following fields exactly:\n- score: integer (0-10)\n- summary: short string (one or two sentences)\n- reason: short string explaining why this score was chosen (explicit facts only)\n- evidence: an array of 0..3 short excerpts from the text that justify the score\n\nImportant: do NOT output any extra text before or after the JSON. The JSON must be parseable.`;
 
     // Call OpenAI API
     console.log('Sending request to OpenAI API...');
-    const model = 'gpt-4o-mini';
+  const model = 'gpt-4o-mini';
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
@@ -99,7 +99,7 @@ serve(async (req) => {
             { role: 'user', content: `Title: ${title}\nContent: ${content.substring(0, 3000)}` }
           ],
           max_tokens: 500,
-          temperature: 0.3
+          temperature: 0.0
         }),
         signal: controller.signal
       });
@@ -156,39 +156,42 @@ serve(async (req) => {
         throw new Error("OpenAI response missing choices or content");
       }
 
-      let result;
+      let result: any = {};
       try {
         result = JSON.parse(answer);
         console.log('Successfully parsed JSON response from OpenAI');
       } catch (error) {
-        console.log('Failed to parse JSON response from OpenAI, extracting manually');
-        const scoreMatch = answer.match(/score['"]?\s*:\s*([0-9]|10)/i);
-        const score = scoreMatch ? parseInt(scoreMatch[1]) : 5;
-        
-        let summaryMatch = answer.match(/summary['"]?\s*:\s*['"]([^'"]+)['"]/i);
-        let summary = "";
-        if (summaryMatch?.[1]) {
-          summary = summaryMatch[1];
-        } else {
-          const paragraphs = answer.split('\n').filter(p => p.trim().length > 0);
-          const found = paragraphs.find(p => p.trim().length > 20 && !p.includes('score'));
-          summary = found || "Konnte keine klare Analyse erstellen. Bitte überprüfen Sie den Inhalt manuell.";
+        console.log('Failed to parse JSON response from OpenAI, attempting to extract fields');
+        // Best-effort extraction
+        const scoreMatch = answer.match(/"?score"?\s*[:=]\s*([0-9]|10)/i);
+        const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+        const summaryMatch = answer.match(/"?summary"?\s*[:=]\s*['\"]([^'\"]+)['\"]/i);
+        const summary = summaryMatch?.[1] || (answer.split('\n').find(l => l.trim().length > 20) || 'Keine klare Analyse verfügbar.');
+        const reasonMatch = answer.match(/"?reason"?\s*[:=]\s*['\"]([^'\"]+)['\"]/i);
+        const reason = reasonMatch?.[1] || '';
+        const evidenceMatches = Array.from(answer.matchAll(/['\"]?evidence['\"]?\s*[:=]\s*\[([^\]]*)\]/i))[0];
+        let evidence: string[] = [];
+        if (evidenceMatches && evidenceMatches[1]) {
+          evidence = evidenceMatches[1].split(/['\"],?\s*['\"]/).map(s => s.replace(/^[\[\]'\"]/g, '').trim()).filter(Boolean).slice(0,3);
         }
-        result = { score, summary };
+        result = { score, summary, reason, evidence };
       }
 
-      // Validate result
-      if (!result.score && result.score !== 0) {
-        result.score = 0;
-      }
-      if (!result.summary) {
-        result.summary = "Keine klare Analyse verfügbar.";
-      }
+      // Normalize fields
+      if (typeof result.score !== 'number') result.score = Number(result.score || 0) || 0;
+      if (!result.summary) result.summary = 'Keine klare Analyse verfügbar.';
+      if (!result.reason) result.reason = '';
+      if (!Array.isArray(result.evidence)) result.evidence = [];
+
+      // Ensure numeric bounds
+      result.score = Math.max(0, Math.min(10, Math.round(result.score)));
 
       return new Response(
         JSON.stringify({
           score: result.score,
           summary: result.summary,
+          reason: result.reason,
+          evidence: result.evidence,
           model
         }),
         {

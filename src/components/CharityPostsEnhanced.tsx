@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { CharityAnalysis, analyzeCharityPost } from '@/utils/charityAnalysis';
+import { parseOpenAIResponse } from '@/lib/openaiResponse';
 import { CharityAnalysisDisplay } from './CharityAnalysis';
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,9 +64,9 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
           return {
             author: a.author_name,
             permlink: a.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? "",
-            title: a.title || a.openai_response.split("\n")[0].slice(0, 80),
+            title: a.title || (a.openai_response ? (parseOpenAIResponse(a.openai_response).summary || a.openai_response.split("\n")[0].slice(0, 80)) : ''),
             created: a.created_at,
-            body: a.body || a.openai_response || "",
+            body: a.body || (a.openai_response ? parseOpenAIResponse(a.openai_response).summary || a.openai_response : ""),
             category: a.category || "",
             tags,
             payout: a.payout || 0,
@@ -88,10 +89,13 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
         (data ?? []).forEach((analysis: any) => {
           const postId = `${analysis.author_name}/${analysis.article_url.match(/@([^\/]+)\/([^\/\?]+)/)?.[2] ?? ""}`;
           if (analysis.charity_score !== null && analysis.openai_response) {
+            const parsed = parseOpenAIResponse(analysis.openai_response);
             newAnalyses[postId] = {
               charyScore: analysis.charity_score,
-              summary: analysis.openai_response
-            };
+              summary: parsed.summary || parsed.raw || '',
+              reason: parsed.reason || undefined,
+              evidence: parsed.evidence || undefined
+            } as CharityAnalysis;
           }
         });
         setAnalyses(newAnalyses);

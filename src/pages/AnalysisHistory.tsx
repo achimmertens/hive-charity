@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { parseOpenAIResponse } from '@/lib/openaiResponse';
 import { Card } from "@/components/ui/card";
 import { AlertTriangle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,10 @@ const columns = [
 function getTitleFromUrl(url: string, openai_response: string): string {
   // Tries to extract the title from the OpenAI summary or the URL
   if (openai_response && openai_response.length > 0) {
+    try {
+      const parsed = parseOpenAIResponse(openai_response);
+      if (parsed.summary && parsed.summary.length < 80) return parsed.summary;
+    } catch {}
     const first = openai_response.split('\n')[0];
     if (first.length < 80) return first;
   }
