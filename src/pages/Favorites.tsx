@@ -88,8 +88,19 @@ const Favorites = () => {
 
   const apiCharyMap = useCharyInComments(sortedAnalyses);
   
-  // Merge API chary data with manual changes
-  const charyMap = { ...apiCharyMap, ...manualCharyMap };
+  // Merge API chary data with database chary_marked and manual changes
+  const dbCharyMap: Record<string, boolean> = {};
+  sortedAnalyses.forEach(analysis => {
+    const urlMatch = analysis.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
+    if (urlMatch) {
+      const key = `${urlMatch[1]}/${urlMatch[2]}`;
+      if (analysis.chary_marked) {
+        dbCharyMap[key] = true;
+      }
+    }
+  });
+  
+  const charyMap = { ...apiCharyMap, ...dbCharyMap, ...manualCharyMap };
 
   const handleSort = (key: string) => {
     if (key === sortKey) {
@@ -125,16 +136,35 @@ const Favorites = () => {
     }
   };
 
-  const handleToggleChary = async (_analysisId: string, postId: string, value: boolean) => {
+  const handleToggleChary = async (analysisId: string, postId: string, value: boolean) => {
+    // Update local state immediately for responsive UI
     setManualCharyMap(prev => ({
       ...prev,
       [postId]: value
     }));
     
-    toast({
-      title: value ? "!CHARY markiert" : "!CHARY entfernt",
-      description: `Der Artikel wurde als ${value ? '!CHARY markiert' : '!CHARY entfernt'}.`,
-    });
+    try {
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ chary_marked: value })
+        .eq('id', analysisId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: value ? "!CHARY markiert" : "!CHARY entfernt",
+        description: `Der Artikel wurde als ${value ? '!CHARY markiert' : '!CHARY entfernt'}.`,
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Error updating chary status:', error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Aktualisieren des !CHARY Status.",
+        variant: "destructive"
+      });
+    }
   };
 
 
