@@ -55,6 +55,15 @@ const formatReputation = (rawReputation: number): number => {
   return Math.round(rawReputation / 1000000000000);
 };
 
+// Search criteria interface
+export interface SearchCriteria {
+  keywords: string[];
+  customKeywords: string[];
+  searchInTags: boolean;
+  searchInBody: boolean;
+  articleCount: number;
+}
+
 // Fetch posts with charity tag or from charity community
 export const fetchCharityPosts = async (): Promise<HivePost[]> => {
   try {
@@ -168,6 +177,92 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
     return uniquePosts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()).slice(0, 10);
   } catch (error) {
     console.error('Error fetching charity posts:', error);
+    return [];
+  }
+};
+
+// Fetch posts based on custom search criteria
+export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): Promise<HivePost[]> => {
+  try {
+    const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
+    
+    // Fetch posts for each keyword
+    const queries = allKeywords.map(keyword => ({
+      jsonrpc: '2.0',
+      method: 'condenser_api.get_discussions_by_created',
+      params: [{ tag: keyword.toLowerCase(), limit: criteria.articleCount }],
+      id: Math.random()
+    }));
+
+    // Execute all queries in parallel
+    const responses = await Promise.all(
+      queries.map(query =>
+        fetch('https://api.hive.blog', {
+          method: 'POST',
+          body: JSON.stringify(query),
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+    );
+
+    const results = await Promise.all(responses.map(r => r.json()));
+
+    // Combine all posts
+    let allPosts: any[] = [];
+    results.forEach(data => {
+      if (data.result) {
+        allPosts = [...allPosts, ...data.result];
+      }
+    });
+
+    // Filter posts based on search criteria
+    const filteredPosts = allPosts.filter(post => {
+      const title = post.title?.toLowerCase() || '';
+      const body = post.body?.toLowerCase() || '';
+      const tags = post.json_metadata ? (JSON.parse(post.json_metadata).tags || []) : [];
+      const tagsStr = tags.join(' ').toLowerCase();
+
+      // Check if post matches any keyword
+      const matchesKeyword = allKeywords.some(keyword => {
+        const kw = keyword.toLowerCase();
+        if (criteria.searchInTags && tagsStr.includes(kw)) return true;
+        if (criteria.searchInBody && (title.includes(kw) || body.includes(kw))) return true;
+        return false;
+      });
+
+      return matchesKeyword;
+    });
+
+    // Process and format posts
+    const processedPosts = filteredPosts.map((post: any) => ({
+      author: post.author,
+      permlink: post.permlink,
+      title: post.title,
+      created: post.created,
+      body: post.body.slice(0, 200) + '...',
+      category: post.category,
+      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      community: post.community,
+      community_title: post.community_title,
+      payout: parseFloat(post.pending_payout_value.split(' ')[0]),
+      upvoted: false,
+      image_url: extractImageUrl(post),
+      author_reputation: formatReputation(post.author_reputation)
+    }));
+
+    // Deduplicate
+    const uniquePosts = processedPosts.filter((post, index, self) =>
+      index === self.findIndex((p) => p.author === post.author && p.permlink === post.permlink)
+    );
+
+    console.log("Total unique posts found with criteria:", uniquePosts.length);
+
+    // Sort by created date (newest first) and limit to requested count
+    return uniquePosts
+      .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
+      .slice(0, criteria.articleCount);
+  } catch (error) {
+    console.error('Error fetching posts with criteria:', error);
     return [];
   }
 };

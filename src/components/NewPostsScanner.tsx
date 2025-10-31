@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { AlertTriangle, Brain, Calendar, ExternalLink, Tag, User, ThumbsUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { HivePost, fetchCharityPosts } from "@/services/hivePost";
+import { HivePost, fetchCharityPosts, fetchCharityPostsWithCriteria } from "@/services/hivePost";
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeCharityPost, CharityAnalysis } from "@/utils/charityAnalysis";
 import { CharityAnalysisDisplay } from "./CharityAnalysis";
@@ -16,6 +16,7 @@ import { postComment, votePost } from "@/services/hiveComment";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { HiveUser } from "@/services/hiveAuth";
+import { SearchDialog, SearchCriteria } from "./SearchDialog";
 
 interface NewPostsScannerProps {
   user: HiveUser;
@@ -36,6 +37,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [voteValue, setVoteValue] = useState<Record<string, number>>({});
   const [voting, setVoting] = useState<Record<string, boolean>>({});
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const maxShown = 30;
 
   // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
@@ -252,12 +254,20 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
     return () => window.removeEventListener('charity:new-analysis', handler as EventListener);
   }, [user?.username]);
 
-  const handleScan = async () => {
+  const handleScan = async (criteria?: SearchCriteria) => {
     if (loading) return;
     setLoading(true);
     setRanOnce(true);
     try {
-      const candidates = await fetchCharityPosts();
+      let candidates: HivePost[];
+      
+      // Use custom criteria if provided, otherwise use default search
+      if (criteria) {
+        candidates = await fetchCharityPostsWithCriteria(criteria);
+      } else {
+        candidates = await fetchCharityPosts();
+      }
+      
       // Filter out posts containing Chinese characters in title or body
       const cjkRegex = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
       const candidatesFiltered = (candidates || []).filter(p => !cjkRegex.test(p.title) && !cjkRegex.test(p.body));
@@ -274,7 +284,8 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         .in('article_url', urls);
 
       const existingUrls = new Set((existing ?? []).map(r => r.article_url as string));
-      const newOnes = candidatesFiltered.filter(p => !existingUrls.has(`https://peakd.com/@${p.author}/${p.permlink}`)).slice(0, 10);
+      const limit = criteria?.articleCount || 10;
+      const newOnes = candidatesFiltered.filter(p => !existingUrls.has(`https://peakd.com/@${p.author}/${p.permlink}`)).slice(0, limit);
 
       if (newOnes.length === 0) {
         toast({ title: "Keine neuen Beiträge", description: "Alle gefundenen Beiträge wurden bereits angezeigt." });
@@ -345,10 +356,16 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   return (
     <div className="max-w-4xl mx-auto mb-8">
       <div className="flex justify-center">
-        <Button onClick={handleScan} disabled={loading} className="bg-hive hover:bg-hive/90">
+        <Button onClick={() => setSearchDialogOpen(true)} disabled={loading} className="bg-hive hover:bg-hive/90">
           {loading ? 'Suche läuft…' : 'Neue Beiträge suchen'}
         </Button>
       </div>
+
+      <SearchDialog 
+        open={searchDialogOpen} 
+        onOpenChange={setSearchDialogOpen}
+        onSearch={handleScan}
+      />
 
       {ranOnce && posts.length === 0 && !loading && (
         <Card className="mt-6">
