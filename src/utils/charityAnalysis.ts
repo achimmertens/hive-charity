@@ -29,6 +29,7 @@ export interface CharityAnalysis {
   charyScore: number;
   summary: string;
   isMock?: boolean;
+  openaiResponse?: string | null;
 }
 
 function checkRateLimit(): boolean {
@@ -199,9 +200,10 @@ export async function analyzeCharityPost(post: HivePost): Promise<CharityAnalysi
       }
       
       const analysis = {
-        charyScore: typeof data.score === 'number' ? data.score : 0,
+        charyScore: adjustedScore,
         summary: data.summary || "Keine klare Analyse verfügbar.",
-        isMock: false
+        isMock: false,
+        openaiResponse: JSON.stringify(structured)
       };
 
       // Speichere Analyse im Cache

@@ -38,7 +38,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
   const maxShown = 30;
 
-  // Load favorite + chary flags for currently displayed posts from Supabase
+  // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
   React.useEffect(() => {
     const loadFavorites = async () => {
       try {
@@ -46,20 +46,34 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         const urls = posts.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
         const { data } = await supabase
           .from('charity_analysis_results')
-          .select('article_url, is_favorite, chary_marked')
+          .select('article_url, is_favorite, chary_marked, openai_response')
           .in('article_url', urls as string[]);
 
         const favMap: Record<string, boolean> = {};
         const charyFlags: Record<string, boolean> = {};
+        const openaiMap: Record<string, string | null> = {};
         (data || []).forEach((row: any) => {
           const match = row.article_url?.match(/@([^\/]+)\/([^\/\?]+)/);
           if (match) {
-            favMap[`${match[1]}/${match[2]}`] = !!row.is_favorite;
-            charyFlags[`${match[1]}/${match[2]}`] = !!row.chary_marked;
+            const key = `${match[1]}/${match[2]}`;
+            favMap[key] = !!row.is_favorite;
+            charyFlags[key] = !!row.chary_marked;
+            openaiMap[key] = row.openai_response || null;
           }
         });
         setFavoriteMap(favMap);
         setCharyMap(charyFlags);
+        
+        // Update analyses with openai_response
+        setAnalyses(prev => {
+          const updated = { ...prev };
+          Object.keys(openaiMap).forEach(key => {
+            if (updated[key]) {
+              updated[key] = { ...updated[key]!, openaiResponse: openaiMap[key] };
+            }
+          });
+          return updated;
+        });
       } catch (e) {
         console.warn('Failed to load favorite flags for visible posts', e);
       }
@@ -540,6 +554,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                 <CharityAnalysisDisplay 
                   analysis={analysis} 
                   loading={analysis === null}
+                  openaiResponse={analysis?.openaiResponse}
                 />
                 {replyOpen[postId] && (
                   <Card>
