@@ -188,6 +188,10 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
     let allPosts: any[] = [];
     
+    // Hive API has a maximum limit of 100 per request
+    const maxLimit = 100;
+    const requestLimit = Math.min(criteria.articleCount, maxLimit);
+    
     // Fetch posts from selected communities
     if (criteria.communities.length > 0) {
       const communityQueries = criteria.communities.map(communityId => {
@@ -195,14 +199,14 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
           return {
             jsonrpc: '2.0',
             method: 'condenser_api.get_discussions_by_trending',
-            params: [{ tag: '', limit: criteria.articleCount }],
+            params: [{ tag: '', limit: requestLimit }],
             id: Math.random()
           };
         } else {
           return {
             jsonrpc: '2.0',
             method: 'bridge.get_ranked_posts',
-            params: { tag: communityId, sort: 'created', limit: criteria.articleCount },
+            params: { tag: communityId, sort: 'created', limit: requestLimit },
             id: Math.random()
           };
         }
@@ -231,7 +235,7 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       const queries = allKeywords.map(keyword => ({
         jsonrpc: '2.0',
         method: 'condenser_api.get_discussions_by_created',
-        params: [{ tag: keyword.toLowerCase(), limit: criteria.articleCount }],
+        params: [{ tag: keyword.toLowerCase(), limit: requestLimit }],
         id: Math.random()
       }));
 
