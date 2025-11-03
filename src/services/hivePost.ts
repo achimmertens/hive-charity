@@ -68,52 +68,12 @@ export interface SearchCriteria {
 // Fetch posts with charity tag or from charity community
 export const fetchCharityPosts = async (): Promise<HivePost[]> => {
   try {
-    // Query for posts with #charity tag - increased limit to 30
-    const tagQuery = {
-      jsonrpc: '2.0',
-      method: 'condenser_api.get_discussions_by_created',
-      params: [{ tag: 'charity', limit: 30 }],
-      id: 1
-    };
-
-    // Query for posts from hive-149312 community - increased limit to 30
-    const communityQuery = {
-      jsonrpc: '2.0',
-      method: 'bridge.get_ranked_posts',
-      params: { tag: 'hive-149312', sort: 'created', limit: 30 },
-      id: 2
-    };
-
-    // Special search query to find more charity-related posts
-    const searchQuery = {
-      jsonrpc: '2.0',
-      method: 'condenser_api.get_discussions_by_created',
-      params: [{ tag: 'charity', limit: 20 }],
-      id: 3
-    };
-
-    // Execute all queries in parallel - use direct API calls instead of proxy
-    const [tagResponse, communityResponse, searchResponse] = await Promise.all([
-      fetch('https://api.hive.blog', {
-        method: 'POST',
-        body: JSON.stringify(tagQuery),
-        headers: { 'Content-Type': 'application/json' }
-      }),
-      fetch('https://api.hive.blog', {
-        method: 'POST',
-        body: JSON.stringify(communityQuery),
-        headers: { 'Content-Type': 'application/json' }
-      }),
-      fetch('https://api.hive.blog', {
-        method: 'POST',
-        body: JSON.stringify(searchQuery),
-        headers: { 'Content-Type': 'application/json' }
-      })
+    // Execute all queries in parallel using resilient RPC (node fallback)
+    const [tagData, communityData, searchData] = await Promise.all([
+      rpc('condenser_api.get_discussions_by_created', [{ tag: 'charity', limit: 30 }]),
+      rpc('bridge.get_ranked_posts', { tag: 'hive-149312', sort: 'created', limit: 30 }),
+      rpc('condenser_api.get_discussions_by_created', [{ tag: 'charity', limit: 20 }])
     ]);
-
-    const tagData = await tagResponse.json();
-    const communityData = await communityResponse.json();
-    const searchData = await searchResponse.json();
 
     console.log("Posts found with charity tag:", tagData.result ? tagData.result.length : 0);
     console.log("Posts found in charity community:", communityData.result ? communityData.result.length : 0);
@@ -212,18 +172,10 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
         }
       });
 
-      const communityResponses = await Promise.all(
-        communityQueries.map(query =>
-          fetch('https://api.hive.blog', {
-            method: 'POST',
-            body: JSON.stringify(query),
-            headers: { 'Content-Type': 'application/json' }
-          })
-        )
+      const communityResults = await Promise.all(
+        communityQueries.map((query) => rpc(query.method, query.params))
       );
-
-      const communityResults = await Promise.all(communityResponses.map(r => r.json()));
-      communityResults.forEach(data => {
+      communityResults.forEach((data) => {
         if (data.result) {
           allPosts = [...allPosts, ...data.result];
         }
@@ -239,18 +191,10 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
         id: Math.random()
       }));
 
-      const responses = await Promise.all(
-        queries.map(query =>
-          fetch('https://api.hive.blog', {
-            method: 'POST',
-            body: JSON.stringify(query),
-            headers: { 'Content-Type': 'application/json' }
-          })
-        )
+      const results = await Promise.all(
+        queries.map((q) => rpc(q.method, q.params))
       );
-
-      const results = await Promise.all(responses.map(r => r.json()));
-      results.forEach(data => {
+      results.forEach((data) => {
         if (data.result) {
           allPosts = [...allPosts, ...data.result];
         }
@@ -348,3 +292,5 @@ export const upvotePost = (
 
 // Import the HiveUser type
 import { HiveUser } from './hiveAuth';
+// Hive RPC helper with node fallback
+import { rpc } from './hiveApi';
