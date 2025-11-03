@@ -62,6 +62,7 @@ export interface SearchCriteria {
   searchInTags: boolean;
   searchInBody: boolean;
   articleCount: number;
+  communities: string[];
 }
 
 // Fetch posts with charity tag or from charity community
@@ -185,35 +186,72 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
 export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): Promise<HivePost[]> => {
   try {
     const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
-    
-    // Fetch posts for each keyword
-    const queries = allKeywords.map(keyword => ({
-      jsonrpc: '2.0',
-      method: 'condenser_api.get_discussions_by_created',
-      params: [{ tag: keyword.toLowerCase(), limit: criteria.articleCount }],
-      id: Math.random()
-    }));
-
-    // Execute all queries in parallel
-    const responses = await Promise.all(
-      queries.map(query =>
-        fetch('https://api.hive.blog', {
-          method: 'POST',
-          body: JSON.stringify(query),
-          headers: { 'Content-Type': 'application/json' }
-        })
-      )
-    );
-
-    const results = await Promise.all(responses.map(r => r.json()));
-
-    // Combine all posts
     let allPosts: any[] = [];
-    results.forEach(data => {
-      if (data.result) {
-        allPosts = [...allPosts, ...data.result];
-      }
-    });
+    
+    // Fetch posts from selected communities
+    if (criteria.communities.length > 0) {
+      const communityQueries = criteria.communities.map(communityId => {
+        if (communityId === 'trending') {
+          return {
+            jsonrpc: '2.0',
+            method: 'condenser_api.get_discussions_by_trending',
+            params: [{ tag: '', limit: criteria.articleCount }],
+            id: Math.random()
+          };
+        } else {
+          return {
+            jsonrpc: '2.0',
+            method: 'bridge.get_ranked_posts',
+            params: { tag: communityId, sort: 'created', limit: criteria.articleCount },
+            id: Math.random()
+          };
+        }
+      });
+
+      const communityResponses = await Promise.all(
+        communityQueries.map(query =>
+          fetch('https://api.hive.blog', {
+            method: 'POST',
+            body: JSON.stringify(query),
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      );
+
+      const communityResults = await Promise.all(communityResponses.map(r => r.json()));
+      communityResults.forEach(data => {
+        if (data.result) {
+          allPosts = [...allPosts, ...data.result];
+        }
+      });
+    }
+    
+    // Fetch posts for each keyword if keywords are selected
+    if (allKeywords.length > 0) {
+      const queries = allKeywords.map(keyword => ({
+        jsonrpc: '2.0',
+        method: 'condenser_api.get_discussions_by_created',
+        params: [{ tag: keyword.toLowerCase(), limit: criteria.articleCount }],
+        id: Math.random()
+      }));
+
+      const responses = await Promise.all(
+        queries.map(query =>
+          fetch('https://api.hive.blog', {
+            method: 'POST',
+            body: JSON.stringify(query),
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      );
+
+      const results = await Promise.all(responses.map(r => r.json()));
+      results.forEach(data => {
+        if (data.result) {
+          allPosts = [...allPosts, ...data.result];
+        }
+      });
+    }
 
     // Filter posts based on search criteria
     const filteredPosts = allPosts.filter(post => {

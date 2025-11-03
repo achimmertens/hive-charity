@@ -11,6 +11,7 @@ export interface SearchCriteria {
   searchInTags: boolean;
   searchInBody: boolean;
   articleCount: number;
+  communities: string[];
 }
 
 interface SearchDialogProps {
@@ -30,6 +31,12 @@ const PREDEFINED_KEYWORDS = [
   "Emergency"
 ];
 
+const COMMUNITIES = [
+  { id: "hive-149312", name: "Charity" },
+  { id: "hive-176874", name: "Hive Ghana" },
+  { id: "trending", name: "Trending" }
+];
+
 export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, onSearch }) => {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>(["Help", "Charity"]);
   const [customKeyword1, setCustomKeyword1] = useState("");
@@ -38,12 +45,21 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
   const [searchInTags, setSearchInTags] = useState(true);
   const [searchInBody, setSearchInBody] = useState(true);
   const [articleCount, setArticleCount] = useState(10);
+  const [selectedCommunities, setSelectedCommunities] = useState<string[]>([]);
 
   const handleKeywordToggle = (keyword: string) => {
     setSelectedKeywords(prev =>
       prev.includes(keyword)
         ? prev.filter(k => k !== keyword)
         : [...prev, keyword]
+    );
+  };
+
+  const handleCommunityToggle = (communityId: string) => {
+    setSelectedCommunities(prev =>
+      prev.includes(communityId)
+        ? prev.filter(c => c !== communityId)
+        : [...prev, communityId]
     );
   };
 
@@ -56,7 +72,8 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
       customKeywords,
       searchInTags,
       searchInBody,
-      articleCount
+      articleCount,
+      communities: selectedCommunities
     });
     onOpenChange(false);
   };
@@ -137,6 +154,25 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
             </div>
           </div>
 
+          {/* Communities */}
+          <div>
+            <Label className="text-base font-semibold mb-3 block">Communities durchsuchen</Label>
+            <div className="space-y-2">
+              {COMMUNITIES.map(community => (
+                <div key={community.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={community.id}
+                    checked={selectedCommunities.includes(community.id)}
+                    onCheckedChange={() => handleCommunityToggle(community.id)}
+                  />
+                  <Label htmlFor={community.id} className="cursor-pointer">
+                    {community.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Article Count */}
           <div>
             <Label htmlFor="articleCount" className="text-base font-semibold mb-3 block">
@@ -146,11 +182,11 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
               id="articleCount"
               type="number"
               min={1}
-              max={30}
+              max={1000}
               value={articleCount}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
-                if (val >= 1 && val <= 30) {
+                if (val >= 1 && val <= 1000) {
                   setArticleCount(val);
                 }
               }}
