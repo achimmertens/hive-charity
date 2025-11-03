@@ -46,6 +46,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
   const [searchInBody, setSearchInBody] = useState(true);
   const [articleCount, setArticleCount] = useState(10);
   const [selectedCommunities, setSelectedCommunities] = useState<string[]>([]);
+  const [communityUrl, setCommunityUrl] = useState("");
 
   const handleKeywordToggle = (keyword: string) => {
     setSelectedKeywords(prev =>
@@ -80,15 +81,15 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Suchkriterien festlegen</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 py-4">
           {/* Predefined Keywords */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Schlagwörter</Label>
+            <Label className="text-base font-semibold mb-2 block">Schlagwörter</Label>
             <div className="grid grid-cols-2 gap-3">
               {PREDEFINED_KEYWORDS.map(keyword => (
                 <div key={keyword} className="flex items-center space-x-2">
@@ -107,7 +108,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
 
           {/* Custom Keywords */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Eigene Suchbegriffe</Label>
+            <Label className="text-base font-semibold mb-2 block">Eigene Suchbegriffe</Label>
             <div className="space-y-2">
               <Input
                 placeholder="Suchbegriff 1"
@@ -129,7 +130,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
 
           {/* Search Location */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Suchen in</Label>
+            <Label className="text-base font-semibold mb-2 block">Suchen in</Label>
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -156,7 +157,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
 
           {/* Communities */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Communities durchsuchen</Label>
+            <Label className="text-base font-semibold mb-2 block">Communities durchsuchen</Label>
             <div className="space-y-2">
               {COMMUNITIES.map(community => (
                 <div key={community.id} className="flex items-center space-x-2">
@@ -173,20 +174,30 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
             </div>
           </div>
 
+          {/* Community URL */}
+          <div>
+            <Label className="text-base font-semibold mb-2 block">Community-URL durchsuchen</Label>
+            <Input
+              placeholder="https://peakd.com/c/hive-174578/created"
+              value={communityUrl}
+              onChange={(e) => setCommunityUrl(e.target.value)}
+            />
+          </div>
+
           {/* Article Count */}
           <div>
-            <Label htmlFor="articleCount" className="text-base font-semibold mb-3 block">
+            <Label htmlFor="articleCount" className="text-base font-semibold mb-2 block">
               Anzahl der Artikel: {articleCount}
             </Label>
             <Input
               id="articleCount"
               type="number"
               min={1}
-              max={1000}
+              max={100}
               value={articleCount}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
-                if (val >= 1 && val <= 1000) {
+                if (val >= 1 && val <= 100) {
                   setArticleCount(val);
                 }
               }}

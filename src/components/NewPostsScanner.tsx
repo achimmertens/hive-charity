@@ -264,6 +264,10 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       // Use custom criteria if provided, otherwise use default search
       if (criteria) {
         candidates = await fetchCharityPostsWithCriteria(criteria);
+        if (criteria.communityUrl) {
+          // Add logic to fetch posts from the specific community URL
+          console.log(`Fetching posts from community URL: ${criteria.communityUrl}`);
+        }
       } else {
         candidates = await fetchCharityPosts();
       }
@@ -364,7 +368,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       <SearchDialog 
         open={searchDialogOpen} 
         onOpenChange={setSearchDialogOpen}
-        onSearch={handleScan}
+        onSearch={(criteria) => handleScan({ ...criteria, communityUrl: criteria.communityUrl })}
       />
 
       {ranOnce && posts.length === 0 && !loading && (
