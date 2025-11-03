@@ -79,6 +79,17 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
     console.log("Posts found in charity community:", communityData.result ? communityData.result.length : 0);
     console.log("Posts found in extended search:", searchData.result ? searchData.result.length : 0);
 
+    // Helper to safely extract tags from json_metadata
+    const safeParseTags = (jsonMetadata: any): string[] => {
+      try {
+        if (!jsonMetadata) return [];
+        const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
+        return metadata.tags || [];
+      } catch (e) {
+        return [];
+      }
+    };
+
     // Process tag posts
     const tagPosts = tagData.result ? tagData.result.map((post: any) => ({
       author: post.author,
@@ -87,7 +98,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       created: post.created,
       body: post.body.slice(0, 200) + '...',
       category: post.category,
-      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      tags: safeParseTags(post.json_metadata),
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false,
       image_url: extractImageUrl(post),
@@ -102,7 +113,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       created: post.created,
       body: post.body.slice(0, 200) + '...',
       category: post.category,
-      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      tags: safeParseTags(post.json_metadata),
       community: post.community,
       community_title: post.community_title,
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
@@ -119,7 +130,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       created: post.created,
       body: post.body.slice(0, 200) + '...',
       category: post.category,
-      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      tags: safeParseTags(post.json_metadata),
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
       upvoted: false,
       image_url: extractImageUrl(post),
@@ -205,7 +216,20 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     const filteredPosts = allPosts.filter(post => {
       const title = post.title?.toLowerCase() || '';
       const body = post.body?.toLowerCase() || '';
-      const tags = post.json_metadata ? (JSON.parse(post.json_metadata).tags || []) : [];
+      
+      // Safely parse json_metadata (could be string, object, or invalid JSON)
+      let tags: string[] = [];
+      try {
+        if (post.json_metadata) {
+          const metadata = typeof post.json_metadata === 'string' 
+            ? JSON.parse(post.json_metadata) 
+            : post.json_metadata;
+          tags = metadata.tags || [];
+        }
+      } catch (e) {
+        // Invalid JSON - skip tags
+        tags = [];
+      }
       const tagsStr = tags.join(' ').toLowerCase();
 
       // Check if post matches any keyword
@@ -219,6 +243,17 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       return matchesKeyword;
     });
 
+    // Helper to safely extract tags (reuse from above)
+    const safeParseTags = (jsonMetadata: any): string[] => {
+      try {
+        if (!jsonMetadata) return [];
+        const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
+        return metadata.tags || [];
+      } catch (e) {
+        return [];
+      }
+    };
+
     // Process and format posts
     const processedPosts = filteredPosts.map((post: any) => ({
       author: post.author,
@@ -227,7 +262,7 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       created: post.created,
       body: post.body.slice(0, 200) + '...',
       category: post.category,
-      tags: post.json_metadata ? JSON.parse(post.json_metadata).tags || [] : [],
+      tags: safeParseTags(post.json_metadata),
       community: post.community,
       community_title: post.community_title,
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
