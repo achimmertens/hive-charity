@@ -59,6 +59,18 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
             </NavigationMenuItem>
             <NavigationMenuItem>
               <Link 
+                to="/report"
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  location.pathname === "/report" 
+                    ? "bg-hive text-white" 
+                    : "hover:bg-muted"
+                }`}
+              >
+                Report
+              </Link>
+            </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link 
                 to="/about"
                 className={`px-4 py-2 rounded-md transition-colors ${
                   location.pathname === "/about" 
