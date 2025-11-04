@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import heroImage from "@/assets/hive-charity-hero.jpg";
+import heroImage from "@/assets/hive-charity-hero.png";
 
 const About: React.FC = () => {
   return (
