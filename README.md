@@ -1,5 +1,11 @@
 # Welcome to your Lovable project
 
+This Tool is a help for curators, that search for charity content.
+It allows to find posts of people, that do good things to other people.
+The goal is to mark these posts and to help donators to focus their money to the right people.
+
+
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/085e92e3-4ad6-452e-b757-613148f63a45
