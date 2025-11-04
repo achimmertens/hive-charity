@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import heroImage from "@/assets/charity-heroes-header.png";
 import callToActionImage from "@/assets/call-to-action.png";
 import whatsAboutImage from "@/assets/whats-about.png";
+import { parseOpenAIResponse } from "@/lib/openaiResponse";
 
 interface CharityHero {
   id: string;
@@ -14,6 +15,7 @@ interface CharityHero {
   article_url: string;
   image_url: string | null;
   title: string | null;
+  openai_response: string | null;
 }
 
 const Report: React.FC = () => {
@@ -84,49 +86,56 @@ const Report: React.FC = () => {
                       <TableHead className="text-center">Reputation</TableHead>
                       <TableHead>URL</TableHead>
                       <TableHead className="text-center">Image</TableHead>
+                      <TableHead>Analyse</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {heroes.map((hero, index) => (
-                      <TableRow key={hero.id}>
-                        <TableCell className="text-center font-medium">{index + 1}</TableCell>
-                        <TableCell className="text-center font-bold text-primary">
-                          {hero.charity_score}
-                        </TableCell>
-                        <TableCell>
-                          <a 
-                            href={hero.article_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            {hero.author_name}
-                          </a>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {hero.author_reputation?.toFixed(0) || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <a 
-                            href={hero.article_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            Link
-                          </a>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {hero.image_url && (
-                            <img 
-                              src={hero.image_url} 
-                              alt={hero.title || 'Post image'} 
-                              className="w-16 h-16 object-cover rounded mx-auto"
-                            />
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {heroes.map((hero, index) => {
+                      const parsed = parseOpenAIResponse(hero.openai_response);
+                      return (
+                        <TableRow key={hero.id}>
+                          <TableCell className="text-center font-medium">{index + 1}</TableCell>
+                          <TableCell className="text-center font-bold text-primary">
+                            {hero.charity_score}
+                          </TableCell>
+                          <TableCell>
+                            <a 
+                              href={hero.article_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              {hero.author_name}
+                            </a>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {hero.author_reputation?.toFixed(0) || 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            <a 
+                              href={hero.article_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Link
+                            </a>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {hero.image_url && (
+                              <img 
+                                src={hero.image_url} 
+                                alt={hero.title || 'Post image'} 
+                                className="w-16 h-16 object-cover rounded mx-auto"
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <p className="text-sm">{parsed.reason || parsed.summary || 'Keine Analyse verfügbar'}</p>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
