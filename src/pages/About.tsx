@@ -39,7 +39,7 @@ const About: React.FC = () => {
                   <p>
                     Es ermöglicht das Auffinden von Beiträgen von Menschen, die Gutes 
                     für andere tun. Das Ziel ist es, diese Beiträge zu markieren und 
-                    Unterstützern zu helfen, ihr Geld gezielt an die richtigen Menschen 
+                    Unterstützern zu helfen, ihre Aufmerksamkeit gezielt an die richtigen Menschen 
                     zu vergeben.
                   </p>
                   
@@ -48,15 +48,15 @@ const About: React.FC = () => {
                   </p>
                   
                   <ul className="list-disc list-inside space-y-2 ml-4">
-                    <li>Charitative Beiträge automatisch analysieren</li>
+                    <li>Hive Beiträge mit KI nach charitativem Inhalt analysieren</li>
                     <li>Beiträge mit dem !CHARY-Tag markieren</li>
                     <li>Favoriten für spätere Überprüfung speichern</li>
                     <li>Direkt aus der App heraus upvoten und kommentieren</li>
-                    <li>Eine Historie aller analysierten Beiträge einsehen</li>
+                    <li>Eine Historie aller analysierten Beiträge erstellen und einsehen</li>
                   </ul>
                   
                   <p className="pt-2 font-medium text-foreground">
-                    Gemeinsam machen wir die Welt ein Stück besser – ein Upvote nach dem anderen!
+                    Schenken wir Aufmerksamkeit gegenüber Menschen die Gutes tun!
                   </p>
                 </div>
               </div>

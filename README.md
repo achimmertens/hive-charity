@@ -4,6 +4,9 @@ This Tool is a help for curators, that search for charity content.
 It allows to find posts of people, that do good things to other people.
 The goal is to mark these posts and to help donators to focus their money to the right people.
 
+Author: Achim Mertens
+https://peakd.com/@achimmertens
+
 
 
 ## Project info
