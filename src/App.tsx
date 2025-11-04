@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import AnalysisHistory from "./pages/AnalysisHistory";
 import Favorites from "./pages/Favorites";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import Navigation from "./components/Navigation";
 import { useState, useEffect } from "react";
@@ -51,6 +52,7 @@ const App = () => {
             <Route path="/" element={<Index user={user} setUser={setUser} />} />
             <Route path="/analysis-history" element={<AnalysisHistory />} />
             <Route path="/favorites" element={<Favorites />} />
+            <Route path="/about" element={<About />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

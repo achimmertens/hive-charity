@@ -12,6 +12,7 @@ export interface SearchCriteria {
   searchInBody: boolean;
   articleCount: number;
   communities: string[];
+  communityUrl?: string;
 }
 
 interface SearchDialogProps {
@@ -74,7 +75,8 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
       searchInTags,
       searchInBody,
       articleCount,
-      communities: selectedCommunities
+      communities: selectedCommunities,
+      communityUrl: communityUrl.trim() || undefined
     });
     onOpenChange(false);
   };

@@ -53,7 +53,7 @@ serve(async (req) => {
           continue;
         }
       } catch (err) {
-        lastError = { node, error: err.message || String(err) };
+        lastError = { node, error: err instanceof Error ? err.message : String(err) };
         continue;
       }
     }

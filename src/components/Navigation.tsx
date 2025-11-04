@@ -57,6 +57,18 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
                 Favoriten
               </Link>
             </NavigationMenuItem>
+            <NavigationMenuItem>
+              <Link 
+                to="/about"
+                className={`px-4 py-2 rounded-md transition-colors ${
+                  location.pathname === "/about" 
+                    ? "bg-hive text-white" 
+                    : "hover:bg-muted"
+                }`}
+              >
+                About Hive-Charity
+              </Link>
+            </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
         {user?.loggedIn && onLogout && (

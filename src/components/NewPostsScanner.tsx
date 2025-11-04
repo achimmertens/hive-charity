@@ -368,7 +368,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       <SearchDialog 
         open={searchDialogOpen} 
         onOpenChange={setSearchDialogOpen}
-        onSearch={(criteria) => handleScan({ ...criteria, communityUrl: criteria.communityUrl })}
+        onSearch={(criteria) => handleScan(criteria)}
       />
 
       {ranOnce && posts.length === 0 && !loading && (
