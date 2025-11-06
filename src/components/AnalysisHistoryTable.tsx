@@ -20,6 +20,8 @@ interface Props {
   onToggleFavorite?: (analysisId: string, value: boolean) => void;
   favoriteMap: Record<string, boolean>;
   archiveMap?: Record<string, boolean>;
+  onUpdateAnalysis?: (analysisId: string, newResponse: string) => void;
+  isEditable?: boolean;
 }
 
 const AnalysisHistoryTable: React.FC<Props> = ({
@@ -32,6 +34,8 @@ const AnalysisHistoryTable: React.FC<Props> = ({
   onToggleChary,
   onToggleFavorite,
   favoriteMap,
+  onUpdateAnalysis,
+  isEditable = false,
 }) => {
   return (
     <Table>
@@ -69,6 +73,8 @@ const AnalysisHistoryTable: React.FC<Props> = ({
               onToggleFavorite={onToggleFavorite ? 
                 (value) => onToggleFavorite(analysis.id, value) : undefined}
               isFavorite={!!favoriteMap[analysis.id]}
+              onUpdateAnalysis={onUpdateAnalysis}
+              isEditable={isEditable}
             />
           );
         })}

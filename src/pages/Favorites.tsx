@@ -173,6 +173,31 @@ const Favorites = () => {
     }
   };
 
+  const handleUpdateAnalysis = async (analysisId: string, newResponse: string) => {
+    try {
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ openai_response: newResponse })
+        .eq('id', analysisId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Analyse aktualisiert",
+        description: "Die Analyse wurde erfolgreich gespeichert.",
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Error updating analysis:', error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Speichern der Analyse.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -230,6 +255,8 @@ const Favorites = () => {
             onToggleFavorite={handleToggleFavorite}
             onToggleChary={handleToggleChary}
             favoriteMap={favoriteMap}
+            onUpdateAnalysis={handleUpdateAnalysis}
+            isEditable={true}
           />
         </div>
       </Card>
