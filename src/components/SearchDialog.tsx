@@ -161,7 +161,10 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
           {/* Communities */}
           <div>
             <Label className="text-base font-semibold mb-2 block">Communities durchsuchen</Label>
-            <div className="space-y-2">
+            <p className="text-sm text-muted-foreground mb-3">
+              Wenn keine Community ausgewählt ist, wird standardmäßig https://peakd.com/created durchsucht.
+            </p>
+            <div className="grid grid-cols-3 gap-3">
               {COMMUNITIES.map(community => (
                 <div key={community.id} className="flex items-center space-x-2">
                   <Checkbox
@@ -169,7 +172,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
                     checked={selectedCommunities.includes(community.id)}
                     onCheckedChange={() => handleCommunityToggle(community.id)}
                   />
-                  <Label htmlFor={community.id} className="cursor-pointer">
+                  <Label htmlFor={community.id} className="cursor-pointer text-sm">
                     {community.name}
                   </Label>
                 </div>

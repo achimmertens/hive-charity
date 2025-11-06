@@ -239,7 +239,7 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     const maxLimit = 100;
     const requestLimit = Math.min(criteria.articleCount, maxLimit);
     
-    // Fetch posts from selected communities
+    // If communities are selected, ONLY fetch from those communities (no keyword searches)
     if (criteria.communities.length > 0) {
       const communityQueries = criteria.communities.map(communityId => {
         if (communityId === 'trending') {
@@ -267,25 +267,20 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
           allPosts = [...allPosts, ...data.result];
         }
       });
-    }
-    
-    // Fetch posts for each keyword if keywords are selected
-    if (allKeywords.length > 0) {
-      const queries = allKeywords.map(keyword => ({
+    } 
+    // If no communities selected, fetch from general "created" feed (default: https://peakd.com/created)
+    else {
+      const defaultQuery = {
         jsonrpc: '2.0',
         method: 'condenser_api.get_discussions_by_created',
-        params: [{ tag: keyword.toLowerCase(), limit: requestLimit }],
+        params: [{ tag: '', limit: requestLimit }],
         id: Math.random()
-      }));
-
-      const results = await Promise.all(
-        queries.map((q) => rpc(q.method, q.params))
-      );
-      results.forEach((data) => {
-        if (data.result) {
-          allPosts = [...allPosts, ...data.result];
-        }
-      });
+      };
+      
+      const defaultResult = await rpc(defaultQuery.method, defaultQuery.params);
+      if (defaultResult.result) {
+        allPosts = [...allPosts, ...defaultResult.result];
+      }
     }
 
     // Filter posts based on search criteria
