@@ -35,6 +35,7 @@ const PREDEFINED_KEYWORDS = [
 const COMMUNITIES = [
   { id: "hive-149312", name: "Charity" },
   { id: "hive-176874", name: "Hive Ghana" },
+  { id: "hive-150210", name: "Clean Planet" },
   { id: "trending", name: "Trending" }
 ];
 
