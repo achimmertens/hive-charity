@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 export interface SearchCriteria {
   keywords: string[];
@@ -195,18 +196,14 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
             <Label htmlFor="articleCount" className="text-base font-semibold mb-2 block">
               Anzahl der Artikel: {articleCount}
             </Label>
-            <Input
+            <Slider
               id="articleCount"
-              type="number"
               min={1}
               max={100}
-              value={articleCount}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (val >= 1 && val <= 100) {
-                  setArticleCount(val);
-                }
-              }}
+              step={1}
+              value={[articleCount]}
+              onValueChange={(value) => setArticleCount(value[0])}
+              className="mt-2"
             />
           </div>
         </div>
