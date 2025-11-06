@@ -47,6 +47,82 @@ const extractImageUrl = (post: any): string | undefined => {
   }
 };
 
+// Extract a displayable description for previews:
+// 1. If json_metadata.description exists, use it.
+// 2. Otherwise fall back to the start of the body.
+// In both cases strip markdown/image tags and leading image URLs, then truncate.
+const getPreviewText = (post: any, maxLen = 200): string => {
+  try {
+    // Try json_metadata.description first
+    if (post.json_metadata) {
+      const metadata = typeof post.json_metadata === 'string' ? JSON.parse(post.json_metadata) : post.json_metadata;
+      if (metadata && metadata.description && typeof metadata.description === 'string' && metadata.description.trim().length > 0) {
+        return sanitizePreview(metadata.description, maxLen);
+      }
+    }
+
+    // Fall back to body
+    const body = post.body || '';
+    return sanitizePreview(body, maxLen);
+  } catch (e) {
+    return sanitizePreview(post.body || '', maxLen);
+  }
+};
+
+// Remove markdown image syntax, HTML <img> tags and standalone image URLs, then trim and truncate
+const sanitizePreview = (text: string, maxLen: number) => {
+  if (!text) return '';
+  let t = text;
+
+  // Remove markdown image ![alt](url)
+  t = t.replace(/!\[[^\]]*\]\([^\)]+\)/g, '');
+
+  // Remove HTML img tags
+  t = t.replace(/<img[^>]*>/gi, '');
+
+  // Remove any remaining HTML tags (e.g. <div class="...">, </p>, etc.)
+  t = t.replace(/<\/?[^>]+(>|$)/g, '');
+
+  // Remove bare image URLs (lines that contain only an image URL)
+  t = t.replace(/^\s*https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp)\s*$/gim, '');
+
+  // Remove inline image URLs
+  t = t.replace(/https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp)/gi, '');
+
+  // Remove markdown links that point to images or known image hosts, or whose link text indicates an image.
+  t = t.replace(/\[([^\]]{0,100})\]\((https?:\/\/[^\)]+)\)/gi, (_m, text, url) => {
+    const urlLower = (url || '').toLowerCase();
+    const textLower = (text || '').toLowerCase();
+
+    // If URL ends with an image extension -> remove entirely
+    if (/\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i.test(urlLower)) return '';
+
+    // Known image hosts or paths
+    if (/pixabay\.com|img\.leopedia|unsplash\.com|pexels\.com|cloudinary|cdn\.|i0\.wp\.com|illustrations|\/images\//i.test(urlLower)) return '';
+
+    // If the link text is a short image-like token (img, imgsrc, image, pic, thumbnail), remove
+    if (/\b(img|image|imgsrc|pic|picture|thumbnail|thumb|sprite)\b/i.test(textLower)) return '';
+
+    // Otherwise keep the link text (replace the full markdown with the text)
+    return text;
+  });
+
+  // Remove any remaining markdown links but keep their text
+  t = t.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+
+  // Remove markdown headings/metadata lines at the start (like > or #) and excessive newlines
+  t = t.replace(/^[>#\s\-_*]{0,3}/gm, '');
+
+  // Replace multiple whitespace/newlines with single space
+  t = t.replace(/\s+/g, ' ').trim();
+
+  if (t.length > maxLen) {
+    return t.slice(0, maxLen).trim() + '...';
+  }
+
+  return t;
+};
+
 // Convert raw reputation value to human-readable number
 const formatReputation = (rawReputation: number): number => {
   if (!rawReputation) return 0;
@@ -96,7 +172,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       permlink: post.permlink,
       title: post.title,
       created: post.created,
-      body: post.body.slice(0, 200) + '...',
+    body: getPreviewText(post, 200),
       category: post.category,
       tags: safeParseTags(post.json_metadata),
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
@@ -111,7 +187,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       permlink: post.permlink,
       title: post.title,
       created: post.created,
-      body: post.body.slice(0, 200) + '...',
+    body: getPreviewText(post, 200),
       category: post.category,
       tags: safeParseTags(post.json_metadata),
       community: post.community,
@@ -128,7 +204,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
       permlink: post.permlink,
       title: post.title,
       created: post.created,
-      body: post.body.slice(0, 200) + '...',
+    body: getPreviewText(post, 200),
       category: post.category,
       tags: safeParseTags(post.json_metadata),
       payout: parseFloat(post.pending_payout_value.split(' ')[0]),
@@ -260,7 +336,7 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       permlink: post.permlink,
       title: post.title,
       created: post.created,
-      body: post.body.slice(0, 200) + '...',
+  body: getPreviewText(post, 200),
       category: post.category,
       tags: safeParseTags(post.json_metadata),
       community: post.community,
