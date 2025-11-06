@@ -14,6 +14,7 @@ export interface SearchCriteria {
   articleCount: number;
   communities: string[];
   communityUrl?: string;
+  maxAgeDays?: number;
 }
 
 interface SearchDialogProps {
@@ -43,13 +44,12 @@ const COMMUNITIES = [
 export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, onSearch }) => {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>(["Help", "Charity"]);
   const [customKeyword1, setCustomKeyword1] = useState("");
-  const [customKeyword2, setCustomKeyword2] = useState("");
-  const [customKeyword3, setCustomKeyword3] = useState("");
   const [searchInTags, setSearchInTags] = useState(true);
   const [searchInBody, setSearchInBody] = useState(true);
   const [articleCount, setArticleCount] = useState(10);
   const [selectedCommunities, setSelectedCommunities] = useState<string[]>([]);
   const [communityUrl, setCommunityUrl] = useState("");
+  const [maxAgeDays, setMaxAgeDays] = useState(100);
 
   const handleKeywordToggle = (keyword: string) => {
     setSelectedKeywords(prev =>
@@ -68,7 +68,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
   };
 
   const handleSearch = () => {
-    const customKeywords = [customKeyword1, customKeyword2, customKeyword3]
+    const customKeywords = [customKeyword1]
       .filter(k => k.trim().length > 0);
     
     onSearch({
@@ -79,6 +79,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
       articleCount,
       communities: selectedCommunities,
       communityUrl: communityUrl.trim() || undefined
+      , maxAgeDays: maxAgeDays
     });
     onOpenChange(false);
   };
@@ -193,6 +194,20 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
               step={1}
               value={[articleCount]}
               onValueChange={(value) => setArticleCount(value[0])}
+              className="mt-2"
+            />
+          </div>
+
+          {/* Max age filter */}
+          <div>
+            <Label className="text-base font-semibold mb-2 block">Max. Alter der Artikel in Tagen: {maxAgeDays === 100 ? 'kein Filter' : `${maxAgeDays} Tage`}</Label>
+            <p className="text-sm text-muted-foreground mb-2">Stelle auf 100, um keinen Zeitfilter zu verwenden.</p>
+            <Slider
+              min={1}
+              max={100}
+              step={1}
+              value={[maxAgeDays]}
+              onValueChange={(v) => setMaxAgeDays(v[0])}
               className="mt-2"
             />
           </div>

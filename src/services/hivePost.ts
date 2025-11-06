@@ -139,6 +139,7 @@ export interface SearchCriteria {
   searchInBody: boolean;
   articleCount: number;
   communities: string[];
+  maxAgeDays?: number;
 }
 
 // Fetch posts with charity tag or from charity community
@@ -342,8 +343,22 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       author_reputation: formatReputation(post.author_reputation)
     }));
 
-    // Deduplicate
-    const uniquePosts = processedPosts.filter((post, index, self) =>
+    // Apply time-based filtering if requested (slider: N -> show posts younger than N+1 days). If N == 100 -> no time filter.
+    let timeFiltered = processedPosts;
+    if (typeof criteria.maxAgeDays === 'number' && criteria.maxAgeDays < 100) {
+      const cutoffDays = criteria.maxAgeDays + 1;
+      const cutoffTs = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
+      timeFiltered = processedPosts.filter(p => {
+        try {
+          return new Date(p.created).getTime() > cutoffTs;
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
+    // Deduplicate (apply to timeFiltered list)
+    const uniquePosts = timeFiltered.filter((post, index, self) =>
       index === self.findIndex((p) => p.author === post.author && p.permlink === post.permlink)
     );
 
