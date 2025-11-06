@@ -94,7 +94,7 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
           {/* Predefined Keywords */}
           <div>
             <Label className="text-base font-semibold mb-2 block">Schlagwörter</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {PREDEFINED_KEYWORDS.map(keyword => (
                 <div key={keyword} className="flex items-center space-x-2">
                   <Checkbox
@@ -118,16 +118,6 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
                 placeholder="Suchbegriff 1"
                 value={customKeyword1}
                 onChange={(e) => setCustomKeyword1(e.target.value)}
-              />
-              <Input
-                placeholder="Suchbegriff 2"
-                value={customKeyword2}
-                onChange={(e) => setCustomKeyword2(e.target.value)}
-              />
-              <Input
-                placeholder="Suchbegriff 3"
-                value={customKeyword3}
-                onChange={(e) => setCustomKeyword3(e.target.value)}
               />
             </div>
           </div>
