@@ -38,6 +38,8 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [voting, setVoting] = useState<Record<string, boolean>>({});
   const [hasVoted, setHasVoted] = useState<Record<string, boolean>>({});
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
+  const [charyDialogOpen, setCharyDialogOpen] = useState(false);
+  const [charyRunning, setCharyRunning] = useState(false);
   const maxShown = 30;
 
   // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
@@ -360,9 +362,14 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   return (
     <div className="max-w-4xl mx-auto mb-8">
       <div className="flex justify-center">
-        <Button onClick={() => setSearchDialogOpen(true)} disabled={loading} className="bg-hive hover:bg-hive/90">
-          {loading ? 'Suche läuft…' : 'Neue Beiträge suchen'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setSearchDialogOpen(true)} disabled={loading} className="bg-hive hover:bg-hive/90">
+            {loading ? 'Suche läuft…' : 'Neue Beiträge suchen'}
+          </Button>
+          <Button onClick={() => setCharyDialogOpen(true)} variant="outline" disabled={charyRunning}>
+            {!charyRunning ? '!CHARY suchen' : 'Suche läuft…'}
+          </Button>
+        </div>
       </div>
 
       <SearchDialog 
@@ -370,6 +377,122 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         onOpenChange={setSearchDialogOpen}
         onSearch={(criteria) => handleScan(criteria)}
       />
+
+      <Dialog open={charyDialogOpen} onOpenChange={setCharyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>!CHARY Suche</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p>Funktioniert derzeit nur lokal auf Achims PC. Dort muss 'npm run scan-runner' ausgeführt werden.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCharyDialogOpen(false)}>Abbrechen</Button>
+            <Button
+              onClick={async () => {
+                setCharyRunning(true);
+                try {
+                  const runner = (import.meta.env.VITE_SCAN_RUNNER_URL as string) || 'http://localhost:8787';
+                  const resp = await fetch(`${runner}/scan`, { method: 'POST' });
+                  const data = await resp.json();
+                  if (!data || !data.ok) {
+                    toast({ title: 'Fehler', description: 'Scan konnte nicht gestartet werden.', variant: 'destructive' });
+                    setCharyRunning(false);
+                    return;
+                  }
+
+                  const files: string[] = data.created && data.created.length > 0 ? data.created : [];
+                  if (files.length === 0) {
+                    const listResp = await fetch(`${runner}/scans`);
+                    const listData = await listResp.json();
+                    if (listData && listData.files && listData.files.length > 0) {
+                      files.push(listData.files[0]);
+                    }
+                  }
+
+                  for (const f of files) {
+                    try {
+                      const fileResp = await fetch(`${runner}/scans/${encodeURIComponent(f)}`);
+                      const json = await fileResp.json();
+                      if (Array.isArray(json)) {
+                        for (const item of json) {
+                          const url = item.url || item.originalUrl;
+                          if (!url) continue;
+                          const match = url.match(/@([^/]+)\/([^/?#]+)/);
+                          if (!match) continue;
+                          const author = match[1];
+                          const permlink = match[2];
+                          try {
+                            const resp = await fetch('https://api.hive.blog', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_content', params: [author, permlink], id: 1 })
+                            });
+                            const d = await resp.json();
+                            const post = d?.result;
+                            if (!post || !post.author) continue;
+
+                            const hivePost: HivePost = {
+                              author: post.author,
+                              permlink: post.permlink,
+                              title: post.title,
+                              body: post.body,
+                              created: post.created,
+                              category: post.category,
+                              tags: post.json_metadata ? (JSON.parse(post.json_metadata).tags || []) : [],
+                              payout: parseFloat(post.pending_payout_value?.split(' ')[0] || '0'),
+                              upvoted: false,
+                              image_url: post.json_metadata ? (() => { try { const meta = JSON.parse(post.json_metadata); if (meta.image && meta.image.length > 0) return meta.image[0]; if (meta.cover_image) return meta.cover_image; return undefined; } catch { return undefined; } })() : undefined,
+                              author_reputation: post.author_reputation ? Math.round(post.author_reputation / 1000000000000) : 0,
+                            };
+
+                            setAnalyses(prev => ({ ...prev, [`${hivePost.author}/${hivePost.permlink}`]: null }));
+                            const res = await analyzeCharityPost(hivePost);
+                            setAnalyses(prev => ({ ...prev, [`${hivePost.author}/${hivePost.permlink}`]: res }));
+
+                            try {
+                              const existingRaw = localStorage.getItem('currentCharityPostsV1');
+                              const existingList: { post: HivePost; analysis: any }[] = existingRaw ? JSON.parse(existingRaw) : [];
+                              const newEntry = { post: hivePost, analysis: { charyScore: res.charyScore, summary: res.summary } };
+                              const combined = [newEntry, ...existingList];
+                              const dedup = new Map<string, any>();
+                              for (const item of combined) {
+                                const k = `${item.post.author}/${item.post.permlink}`;
+                                if (!dedup.has(k)) dedup.set(k, item);
+                              }
+                              const persisted = Array.from(dedup.values()).slice(0, maxShown);
+                              localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
+                              window.dispatchEvent(new CustomEvent('charity:new-analysis', { detail: newEntry }));
+                            } catch (e) {
+                              console.warn('Failed to persist scan entry', e);
+                            }
+
+                          } catch (err) {
+                            console.warn('Failed to fetch post for scan item', err);
+                            continue;
+                          }
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('Failed to load scan file', f, err);
+                    }
+                  }
+
+                  toast({ title: 'Scan abgeschlossen', description: `${files.length} Scan-Dateien verarbeitet` });
+                } catch (err) {
+                  console.error(err);
+                  toast({ title: 'Fehler beim Starten des Scans', description: String(err), variant: 'destructive' });
+                }
+                setCharyRunning(false);
+                setCharyDialogOpen(false);
+              }}
+              className="bg-hive hover:bg-hive/90"
+            >
+              Suche starten
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {ranOnce && posts.length === 0 && !loading && (
         <Card className="mt-6">
