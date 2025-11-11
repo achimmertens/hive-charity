@@ -84,7 +84,7 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
             </NavigationMenuItem>
           </NavigationMenuList>
         </NavigationMenu>
-        {user?.loggedIn && onLogout && (
+        {user?.loggedIn && onLogout ? (
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
               <AvatarImage 
@@ -99,6 +99,12 @@ const Navigation: React.FC<NavigationProps> = ({ user, onLogout }) => {
               Ausloggen
             </Button>
           </div>
+        ) : (
+          <Link to="/">
+            <Button variant="default">
+              Einloggen
+            </Button>
+          </Link>
         )}
       </div>
     </div>
