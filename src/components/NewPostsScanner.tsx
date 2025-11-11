@@ -384,7 +384,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
             <DialogTitle>!CHARY Suche</DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <p>Funktioniert derzeit nur lokal auf Achims PC. Dort muss 'npm run scan-runner' ausgeführt werden.</p>
+            <p>Funktioniert derzeit nur lokal auf Achims PC.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCharyDialogOpen(false)}>Abbrechen</Button>
@@ -410,6 +410,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                     }
                   }
 
+                  let postsImported = 0;
                   for (const f of files) {
                     try {
                       const fileResp = await fetch(`${runner}/scans/${encodeURIComponent(f)}`);
@@ -463,6 +464,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               const persisted = Array.from(dedup.values()).slice(0, maxShown);
                               localStorage.setItem('currentCharityPostsV1', JSON.stringify(persisted));
                               window.dispatchEvent(new CustomEvent('charity:new-analysis', { detail: newEntry }));
+                              postsImported++;
                             } catch (e) {
                               console.warn('Failed to persist scan entry', e);
                             }
@@ -478,7 +480,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                     }
                   }
 
-                  toast({ title: 'Scan abgeschlossen', description: `${files.length} Scan-Dateien verarbeitet` });
+                  toast({ title: 'Scan abgeschlossen', description: `${files.length} Scan-Dateien verarbeitet — ${postsImported} Beiträge importiert und analysiert.` });
                 } catch (err) {
                   console.error(err);
                   toast({ title: 'Fehler beim Starten des Scans', description: String(err), variant: 'destructive' });
