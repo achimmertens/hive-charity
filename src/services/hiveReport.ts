@@ -86,6 +86,7 @@ function parseOpenAIResponse(response: string | null): { reason?: string; summar
 export function postReportToHive(
   user: HiveUser & { authType: 'keychain' | 'hivesigner' },
   heroes: any[],
+  customBody: string | null,
   onResult: (success: boolean, message: string, url?: string) => void
 ) {
   if (!user || !user.loggedIn) {
@@ -96,7 +97,7 @@ export function postReportToHive(
   const weekNumber = getWeekNumber();
   const title = `Charity Heroes Report Week ${weekNumber}`;
   const permlink = generatePostPermlink(title);
-  const body = generateReportMarkdown(heroes);
+  const body = customBody || generateReportMarkdown(heroes);
   
   const jsonMetadata = JSON.stringify({
     app: "hive-charity-explorer",

@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import heroImage from "@/assets/charity-heroes-header.png";
 import callToActionImage from "@/assets/call-to-action.png";
 import whatsAboutImage from "@/assets/whats-about.png";
 import { parseOpenAIResponse } from "@/lib/openaiResponse";
-import { postReportToHive } from "@/services/hiveReport";
+import { postReportToHive, generateReportMarkdown } from "@/services/hiveReport";
 import { Loader2 } from "lucide-react";
 
 interface CharityHero {
@@ -26,6 +28,8 @@ const Report: React.FC = () => {
   const [heroes, setHeroes] = useState<CharityHero[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editableMarkdown, setEditableMarkdown] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,11 +84,25 @@ const Report: React.FC = () => {
       return;
     }
 
+    // Generate markdown and open dialog for editing
+    const markdown = generateReportMarkdown(heroes);
+    setEditableMarkdown(markdown);
+    setDialogOpen(true);
+  };
+
+  const handlePublishConfirm = () => {
+    const userStr = localStorage.getItem('hiveUser');
+    if (!userStr) return;
+    
+    const user = JSON.parse(userStr);
+    
     setPublishing(true);
+    setDialogOpen(false);
     
     postReportToHive(
       { ...user, authType: 'keychain' as const },
       heroes,
+      editableMarkdown, // Pass the edited markdown
       (success, message, url) => {
         setPublishing(false);
         
@@ -114,8 +132,36 @@ const Report: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-5xl">
-      <Card>
+    <>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Post-Vorschau bearbeiten</DialogTitle>
+            <DialogDescription>
+              Bearbeiten Sie den Post-Text vor der Veröffentlichung. Der Text verwendet Markdown-Format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              value={editableMarkdown}
+              onChange={(e) => setEditableMarkdown(e.target.value)}
+              className="min-h-[400px] font-mono text-sm"
+              placeholder="Post-Inhalt..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handlePublishConfirm}>
+              Jetzt veröffentlichen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="container mx-auto py-8 max-w-5xl">
+        <Card>
         <CardHeader>
           <div className="flex flex-col items-center gap-4">
             <CardTitle className="text-4xl font-bold text-center">
@@ -285,8 +331,9 @@ const Report: React.FC = () => {
             <p>CharityChecker (alias <a href="https://peakd.com/@achimmertens" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@achimmertens</a>)</p>
           </div>
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   );
 };
 
