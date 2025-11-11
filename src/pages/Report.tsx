@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import heroImage from "@/assets/charity-heroes-header.png";
 import callToActionImage from "@/assets/call-to-action.png";
 import whatsAboutImage from "@/assets/whats-about.png";
 import { parseOpenAIResponse } from "@/lib/openaiResponse";
+import { postReportToHive } from "@/services/hiveReport";
+import { Loader2 } from "lucide-react";
 
 interface CharityHero {
   id: string;
@@ -21,6 +25,8 @@ interface CharityHero {
 const Report: React.FC = () => {
   const [heroes, setHeroes] = useState<CharityHero[]>([]);
   const [loading, setLoading] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchCharityHeroes = async () => {
@@ -43,13 +49,87 @@ const Report: React.FC = () => {
     fetchCharityHeroes();
   }, []);
 
+  const handleMakePublic = () => {
+    // Get user from localStorage
+    const userStr = localStorage.getItem('hiveUser');
+    if (!userStr) {
+      toast({
+        title: "Nicht eingeloggt",
+        description: "Bitte loggen Sie sich zuerst mit Hive Keychain ein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const user = JSON.parse(userStr);
+    if (!user.loggedIn) {
+      toast({
+        title: "Nicht eingeloggt",
+        description: "Bitte loggen Sie sich zuerst mit Hive Keychain ein.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (heroes.length === 0) {
+      toast({
+        title: "Keine Heroes",
+        description: "Es gibt keine Charity Heroes zum Veröffentlichen.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPublishing(true);
+    
+    postReportToHive(
+      { ...user, authType: 'keychain' as const },
+      heroes,
+      (success, message, url) => {
+        setPublishing(false);
+        
+        if (success && url) {
+          toast({
+            title: "Erfolgreich veröffentlicht!",
+            description: (
+              <a 
+                href={url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Klicken Sie hier, um den Post zu sehen
+              </a>
+            ),
+          });
+        } else {
+          toast({
+            title: success ? "Erfolg" : "Fehler",
+            description: message,
+            variant: success ? "default" : "destructive"
+          });
+        }
+      }
+    );
+  };
+
   return (
     <div className="container mx-auto py-8 max-w-5xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-4xl font-bold text-center">
-            Charity Heroes Report
-          </CardTitle>
+          <div className="flex flex-col items-center gap-4">
+            <CardTitle className="text-4xl font-bold text-center">
+              Charity Heroes Report
+            </CardTitle>
+            <Button 
+              onClick={handleMakePublic}
+              disabled={publishing || heroes.length === 0}
+              size="lg"
+            >
+              {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {publishing ? "Veröffentliche..." : "Make Public"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-8">
           {/* Intro Text */}
