@@ -29,6 +29,7 @@ interface Props {
   onToggleFavorite?: (value: boolean) => void;
   isFavorite: boolean;
   onUpdateAnalysis?: (analysisId: string, newResponse: string) => void;
+  onUpdateScore?: (analysisId: string, newScore: number) => void;
   isEditable?: boolean;
 }
 
@@ -39,11 +40,14 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
   onToggleFavorite,
   isFavorite,
   onUpdateAnalysis,
+  onUpdateScore,
   isEditable = false
 }) => {
   const [open, setOpen] = useState(false);
   const [isEditingAnalysis, setIsEditingAnalysis] = useState(false);
   const [editedAnalysis, setEditedAnalysis] = useState(analysis.openai_response);
+  const [isEditingScore, setIsEditingScore] = useState(false);
+  const [editedScore, setEditedScore] = useState(analysis.charity_score.toString());
 
   return (
     <>
@@ -68,7 +72,58 @@ const AnalysisHistoryTableRow: React.FC<Props> = ({
           />
         )}
       </TableCell>
-      <TableCell>{analysis.charity_score}</TableCell>
+      <TableCell>
+        {isEditable && isEditingScore ? (
+          <div className="flex gap-2 items-center">
+            <input
+              type="number"
+              value={editedScore}
+              onChange={(e) => setEditedScore(e.target.value)}
+              className="w-20 px-2 py-1 border rounded text-sm"
+              min="0"
+              max="100"
+            />
+            <Button
+              size="sm"
+              onClick={() => {
+                const newScore = parseInt(editedScore, 10);
+                if (!isNaN(newScore) && newScore >= 0 && newScore <= 100 && onUpdateScore) {
+                  onUpdateScore(analysis.id, newScore);
+                  setIsEditingScore(false);
+                }
+              }}
+              className="h-8 w-8 p-0"
+            >
+              <Check className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditedScore(analysis.charity_score.toString());
+                setIsEditingScore(false);
+              }}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span>{analysis.charity_score}</span>
+            {isEditable && onUpdateScore && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setIsEditingScore(true)}
+                className="h-8 w-8 p-0"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
+      </TableCell>
           <TableCell>
             {isEditable && isEditingAnalysis ? (
               <div className="space-y-2">

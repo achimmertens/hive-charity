@@ -198,6 +198,31 @@ const Favorites = () => {
     }
   };
 
+  const handleUpdateScore = async (analysisId: string, newScore: number) => {
+    try {
+      const { error } = await supabase
+        .from('charity_analysis_results')
+        .update({ charity_score: newScore })
+        .eq('id', analysisId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Charity-Score aktualisiert",
+        description: "Der Charity-Score wurde erfolgreich gespeichert.",
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Error updating score:', error);
+      toast({
+        title: "Fehler",
+        description: "Fehler beim Speichern des Charity-Scores.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -256,6 +281,7 @@ const Favorites = () => {
             onToggleChary={handleToggleChary}
             favoriteMap={favoriteMap}
             onUpdateAnalysis={handleUpdateAnalysis}
+            onUpdateScore={handleUpdateScore}
             isEditable={true}
           />
         </div>

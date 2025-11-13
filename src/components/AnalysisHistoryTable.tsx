@@ -21,6 +21,7 @@ interface Props {
   favoriteMap: Record<string, boolean>;
   archiveMap?: Record<string, boolean>;
   onUpdateAnalysis?: (analysisId: string, newResponse: string) => void;
+  onUpdateScore?: (analysisId: string, newScore: number) => void;
   isEditable?: boolean;
 }
 
@@ -35,6 +36,7 @@ const AnalysisHistoryTable: React.FC<Props> = ({
   onToggleFavorite,
   favoriteMap,
   onUpdateAnalysis,
+  onUpdateScore,
   isEditable = false,
 }) => {
   return (
@@ -74,6 +76,7 @@ const AnalysisHistoryTable: React.FC<Props> = ({
                 (value) => onToggleFavorite(analysis.id, value) : undefined}
               isFavorite={!!favoriteMap[analysis.id]}
               onUpdateAnalysis={onUpdateAnalysis}
+              onUpdateScore={onUpdateScore}
               isEditable={isEditable}
             />
           );
