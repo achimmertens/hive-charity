@@ -244,10 +244,11 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     if (criteria.communities.length > 0) {
       const communityQueries = criteria.communities.map(communityId => {
         if (communityId === 'trending') {
+          // Use bridge.get_ranked_posts with trending sort instead of deprecated condenser_api
           return {
             jsonrpc: '2.0',
-            method: 'condenser_api.get_discussions_by_trending',
-            params: [{ tag: '', limit: requestLimit }],
+            method: 'bridge.get_ranked_posts',
+            params: { sort: 'trending', limit: requestLimit },
             id: Math.random()
           };
         } else {
