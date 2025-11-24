@@ -244,11 +244,11 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     if (criteria.communities.length > 0) {
       const communityQueries = criteria.communities.map(communityId => {
         if (communityId === 'trending') {
-          // Use bridge.get_ranked_posts with trending sort instead of deprecated condenser_api
+          // Use bridge.get_ranked_posts with trending sort for the global trending feed
           return {
             jsonrpc: '2.0',
             method: 'bridge.get_ranked_posts',
-            params: { sort: 'trending', limit: requestLimit },
+            params: { tag: '', sort: 'trending', limit: requestLimit },
             id: Math.random()
           };
         } else {
@@ -262,10 +262,17 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       });
 
       const communityResults = await Promise.all(
-        communityQueries.map((query) => rpc(query.method, query.params))
+        communityQueries.map(async (query) => {
+          try {
+            return await rpc(query.method, query.params);
+          } catch (error) {
+            console.error('Error fetching community posts:', { method: query.method, params: query.params, error });
+            return null;
+          }
+        })
       );
       communityResults.forEach((data) => {
-        if (data.result) {
+        if (data && data.result) {
           allPosts = [...allPosts, ...data.result];
         }
       });
