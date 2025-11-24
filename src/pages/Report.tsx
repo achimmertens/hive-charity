@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import heroImage from "@/assets/charity-heroes-header.png";
 import callToActionImage from "@/assets/call-to-action.png";
+import callToActionImage2 from "@/assets/call-to-action2.png";
 import whatsAboutImage from "@/assets/whats-about.png";
+import whatsGoodCharityContent from "@/assets/good-charity-content.png";
 import { parseOpenAIResponse } from "@/lib/openaiResponse";
 import { postReportToHive, generateReportMarkdown } from "@/services/hiveReport";
 import { Loader2 } from "lucide-react";
@@ -278,6 +280,13 @@ const Report: React.FC = () => {
                 className="w-full max-w-2xl rounded-lg"
               />
             </div>
+            <div className="flex justify-center">
+              <img 
+                src={callToActionImage2} 
+                alt="Call to Action2" 
+                className="w-full max-w-2xl rounded-lg"
+              />
+            </div>
           </div>
 
           {/* What's about this report */}
@@ -287,6 +296,18 @@ const Report: React.FC = () => {
               <img 
                 src={whatsAboutImage} 
                 alt="What's about this report" 
+                className="w-full max-w-2xl rounded-lg"
+              />
+            </div>
+          </div>
+
+          {/* What Is Good Charity Content */}
+          <div className="space-y-6">
+            <h2 className="text-3xl font-bold text-center">What is good charity content?</h2>
+            <div className="flex justify-center">
+              <img 
+                src={whatsGoodCharityContent} 
+                alt="What is good charity content" 
                 className="w-full max-w-2xl rounded-lg"
               />
             </div>
