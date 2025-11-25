@@ -1,4 +1,4 @@
-// Lightweight Hive RPC helper with node fallback to avoid CORS/400 issues on individual nodes
+// Lightweight Hive RPC helper using Supabase Edge Function proxy to avoid CORS issues
 export interface RpcResponse<T = any> {
   id: number | string
   jsonrpc: '2.0'
@@ -6,18 +6,10 @@ export interface RpcResponse<T = any> {
   error?: any
 }
 
-// A small pool of reliable public Hive nodes (order matters; we'll try each until one succeeds)
-const HIVE_NODES = [
-  'https://api.hive.blog',
-  'https://api.deathwing.me',
-  'https://api.openhive.network',
-  'https://anyx.io',
-  'https://rpc.ausbit.dev',
-  'https://hive-api.arcange.eu',
-  'https://api.c0ff33a.uk'
-];
+// Use the Supabase Edge Function proxy to avoid CORS issues
+const HIVE_PROXY_URL = 'https://zwxepwsfcxfifiupmjmk.supabase.co/functions/v1/hive-proxy';
 
-// Perform a JSON-RPC call with automatic node fallback. Returns the full JSON-RPC response.
+// Perform a JSON-RPC call via the Supabase proxy. Returns the full JSON-RPC response.
 export async function rpc<T = any>(method: string, params: any): Promise<RpcResponse<T>> {
   const payload = {
     jsonrpc: '2.0' as const,
@@ -26,40 +18,34 @@ export async function rpc<T = any>(method: string, params: any): Promise<RpcResp
     id: Date.now()
   };
 
-  // Try each node until we get a valid result
-  const errors: Array<{ node: string; error: string }> = [];
-  
-  for (const node of HIVE_NODES) {
-    try {
-      const res = await fetch(node, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+  try {
+    const res = await fetch(HIVE_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-      // If the node returns a non-2xx status (often 400) it may also omit CORS headers.
-      // In that case, do NOT try to read the body – just continue to the next node.
-      if (!res.ok) {
-        errors.push({ node, error: `HTTP ${res.status}` });
-        continue;
-      }
-
-      const json = (await res.json()) as RpcResponse<T>;
-
-      // If the response contains a usable result, return it; otherwise try next node.
-      if (json && typeof json === 'object' && 'result' in json) {
-        console.log(`✓ Hive API success via ${node}`);
-        return json;
-      }
-      
-      errors.push({ node, error: 'Invalid response format' });
-    } catch (e) {
-      // Network/CORS/parse errors – try the next node
-      errors.push({ node, error: e instanceof Error ? e.message : 'Unknown error' });
-      continue;
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`Hive proxy error (${res.status}):`, errorText);
+      throw new Error(`Hive proxy failed with status ${res.status}`);
     }
-  }
 
-  console.error(`All Hive nodes failed for method ${method}:`, errors);
-  throw new Error(`All Hive nodes failed for method ${method}`);
+    const json = (await res.json()) as RpcResponse<T>;
+
+    if (json && typeof json === 'object' && 'result' in json) {
+      console.log(`✓ Hive API success via proxy`);
+      return json;
+    }
+    
+    if (json && json.error) {
+      console.error('Hive API error:', json.error);
+      throw new Error(`Hive API error: ${JSON.stringify(json.error)}`);
+    }
+
+    throw new Error('Invalid response format from Hive proxy');
+  } catch (e) {
+    console.error('Error calling Hive proxy:', e);
+    throw e;
+  }
 }

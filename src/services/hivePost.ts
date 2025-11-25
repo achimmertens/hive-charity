@@ -236,8 +236,8 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
     let allPosts: any[] = [];
     
-    // Hive API has a maximum limit of 100 per request
-    const maxLimit = 100;
+    // Hive API has a maximum limit of 20 for bridge.get_ranked_posts
+    const maxLimit = 20;
     const requestLimit = Math.min(criteria.articleCount, maxLimit);
     
     // If communities are selected, ONLY fetch from those communities (no keyword searches)
