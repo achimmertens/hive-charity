@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,9 @@ export const SearchDialog: React.FC<SearchDialogProps> = ({ open, onOpenChange, 
       <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Suchkriterien festlegen</DialogTitle>
+          <DialogDescription>
+            Wählen Sie Schlagwörter, Communities und Filter, um neue Charity-Beiträge zu finden.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

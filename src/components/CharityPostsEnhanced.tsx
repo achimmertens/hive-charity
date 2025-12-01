@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { postComment, votePost } from "@/services/hiveComment";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { HiveUser } from "@/services/hiveAuth";
 
@@ -388,6 +388,9 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Upvote vergeben</DialogTitle>
+                  <DialogDescription>
+                    Wählen Sie die Stärke des Upvotes für diesen Beitrag.
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <div className="flex items-center justify-between mb-2">

@@ -13,7 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
 import { postComment, votePost } from "@/services/hiveComment";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { HiveUser } from "@/services/hiveAuth";
 import { SearchDialog, SearchCriteria } from "./SearchDialog";
@@ -354,7 +354,15 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       toast({ title: `${newOnes.length} neue Beiträge analysiert`, description: "Die Ergebnisse wurden auch in der Historie gespeichert." });
     } catch (error) {
       console.error(error);
-      toast({ title: "Fehler beim Suchen", description: String(error), variant: "destructive" });
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('All RPC nodes failed')) {
+        toast({
+          title: "Hive-Suche derzeit nicht verfügbar",
+          description: "Es konnten keine Hive-RPC-Knoten erreicht werden. Bitte versuchen Sie es später erneut.",
+        });
+      } else {
+        toast({ title: "Fehler beim Suchen", description: message, variant: "destructive" });
+      }
     }
     setLoading(false);
   };
@@ -382,6 +390,9 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>!CHARY Suche</DialogTitle>
+            <DialogDescription>
+              Starte einen lokalen !CHARY-Scan über Achims PC (nur in der lokalen Umgebung verfügbar).
+            </DialogDescription>
           </DialogHeader>
           <div className="py-2">
             <p>Funktioniert derzeit nur lokal auf Achims PC.</p>
