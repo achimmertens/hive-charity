@@ -60,7 +60,11 @@ serve(async (req) => {
     }
 
     // If we get here, no node returned a usable response
-    return new Response(JSON.stringify({ error: true, message: 'All RPC nodes failed', lastError }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // We return HTTP 200 with an error payload so the frontend can handle fallbacks
+    return new Response(
+      JSON.stringify({ error: true, message: 'All RPC nodes failed', lastError, statusCode: 502 }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
 
   } catch (error: any) {
     console.error('hive-proxy error:', error);
