@@ -29,7 +29,8 @@ serve(async (req) => {
     // Try multiple public Hive RPC nodes server-side to avoid client CORS issues
     const HIVE_RPC_NODES = [
       'https://api.hive.blog',
-      'https://api.ausbit.dev'
+      'https://api.deathwing.me',
+      'https://anyx.io'
     ];
 
     let lastError: any = null;
