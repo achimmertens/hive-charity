@@ -40,6 +40,9 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [charyDialogOpen, setCharyDialogOpen] = useState(false);
   const [charyRunning, setCharyRunning] = useState(false);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testTitles, setTestTitles] = useState<string[]>([]);
   const maxShown = 30;
 
   // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
@@ -377,6 +380,54 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
           <Button onClick={() => setCharyDialogOpen(true)} variant="outline" disabled={charyRunning}>
             {!charyRunning ? '!CHARY suchen' : 'Suche läuft…'}
           </Button>
+          <Button
+            onClick={async () => {
+              if (testLoading) return;
+              setTestLoading(true);
+              try {
+                // Use optional proxy if configured, otherwise use public hive node
+                const rpc = (import.meta.env.VITE_HIVE_PROXY_URL as string) || 'https://api.hive.blog';
+
+                // Primary JSON-RPC call for recent discussions
+                const body = JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_discussions_by_created', params: [{ limit: 10 }], id: 1 });
+
+                const resp = await fetch(rpc, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body,
+                });
+
+                const data = await resp.json();
+
+                let items: any[] = [];
+                if (Array.isArray(data?.result)) items = data.result;
+                else if (Array.isArray(data?.result?.items)) items = data.result.items; // some proxies wrap result
+                else if (data?.result && typeof data.result === 'object') {
+                  // try to extract values
+                  items = Object.values(data.result).filter((v: any) => Array.isArray(v)).flat() as any[];
+                }
+
+                const titles = (items || []).map((it: any) => it?.title || (it?.author && it?.permlink ? `${it.author}/${it.permlink}` : undefined)).filter(Boolean).slice(0, 10) as string[];
+
+                if (titles.length === 0) {
+                  toast({ title: 'Keine Artikel gefunden', description: 'Der RPC hat keine Beiträge zurückgeliefert.' });
+                }
+
+                setTestTitles(titles);
+                setTestDialogOpen(true);
+              } catch (err) {
+                console.error('TesteHive failed', err);
+                toast({ title: 'Fehler', description: 'Konnte Beiträge nicht laden.', variant: 'destructive' });
+              } finally {
+                setTestLoading(false);
+              }
+            }}
+            variant="ghost"
+            disabled={testLoading}
+            title="Lädt die letzten 10 Artikel von Hive"
+          >
+            {testLoading ? 'TesteHive…' : 'TesteHive'}
+          </Button>
         </div>
       </div>
 
@@ -503,6 +554,33 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
             >
               Suche starten
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>TesteHive — letzte 10 Artikel</DialogTitle>
+            <DialogDescription>
+              Hier sind die Überschriften der zuletzt erstellten Beiträge auf Hive.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {testLoading ? (
+              <p>Lädt…</p>
+            ) : testTitles.length === 0 ? (
+              <p>Keine Beiträge gefunden.</p>
+            ) : (
+              <ul className="list-disc list-inside space-y-2 text-left">
+                {testTitles.map((t, i) => (
+                  <li key={i} className="break-words">{t}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestDialogOpen(false)}>Schließen</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
