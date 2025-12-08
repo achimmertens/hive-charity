@@ -230,7 +230,7 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
   }
 };
 
-// Fetch posts based on custom search criteria - uses directPost for reliable CORS-free calls
+// Fetch posts based on custom search criteria - uses rpc which goes through Edge Function proxy
 export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): Promise<HivePost[]> => {
   try {
     const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
@@ -247,9 +247,9 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
           try {
             if (communityId === 'trending') {
               // Use bridge.get_ranked_posts with trending sort for the global trending feed
-              return await directPost('bridge.get_ranked_posts', { tag: '', sort: 'trending', limit: requestLimit });
+              return await rpc('bridge.get_ranked_posts', { tag: '', sort: 'trending', limit: requestLimit });
             } else {
-              return await directPost('bridge.get_ranked_posts', { tag: communityId, sort: 'created', limit: requestLimit });
+              return await rpc('bridge.get_ranked_posts', { tag: communityId, sort: 'created', limit: requestLimit });
             }
           } catch (error) {
             console.error('Error fetching community posts:', { communityId, error });
@@ -267,7 +267,7 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     // If no communities selected, fetch from general "created" feed (default: https://peakd.com/created)
     else {
       try {
-        const defaultResult = await directPost('condenser_api.get_discussions_by_created', [{ tag: '', limit: requestLimit }]);
+        const defaultResult = await rpc('condenser_api.get_discussions_by_created', [{ tag: '', limit: requestLimit }]);
         if (defaultResult.result) {
           allPosts = [...allPosts, ...defaultResult.result];
         }
@@ -407,4 +407,4 @@ export const upvotePost = (
 // Import the HiveUser type
 import { HiveUser } from './hiveAuth';
 // Hive RPC helper with node fallback
-import { rpc, directPost } from './hiveApi';
+import { rpc } from './hiveApi';
