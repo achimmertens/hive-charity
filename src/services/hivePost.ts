@@ -242,35 +242,22 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     
     // If communities are selected, ONLY fetch from those communities (no keyword searches)
     if (criteria.communities.length > 0) {
-      const communityQueries = criteria.communities.map(communityId => {
-        if (communityId === 'trending') {
-          // Use bridge.get_ranked_posts with trending sort for the global trending feed
-          return {
-            jsonrpc: '2.0',
-            method: 'bridge.get_ranked_posts',
-            params: { tag: '', sort: 'trending', limit: requestLimit },
-            id: Math.random()
-          };
-        } else {
-          return {
-            jsonrpc: '2.0',
-            method: 'bridge.get_ranked_posts',
-            params: { tag: communityId, sort: 'created', limit: requestLimit },
-            id: Math.random()
-          };
-        }
-      });
-
       const communityResults = await Promise.all(
-        communityQueries.map(async (query) => {
+        criteria.communities.map(async (communityId) => {
           try {
-            return await rpc(query.method, query.params);
+            if (communityId === 'trending') {
+              // Use bridge.get_ranked_posts with trending sort for the global trending feed
+              return await rpc('bridge.get_ranked_posts', { tag: '', sort: 'trending', limit: requestLimit });
+            } else {
+              return await rpc('bridge.get_ranked_posts', { tag: communityId, sort: 'created', limit: requestLimit });
+            }
           } catch (error) {
-            console.error('Error fetching community posts:', { method: query.method, params: query.params, error });
+            console.error('Error fetching community posts:', { communityId, error });
             return null;
           }
         })
       );
+
       communityResults.forEach((data) => {
         if (data && data.result) {
           allPosts = [...allPosts, ...data.result];
@@ -279,16 +266,14 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
     } 
     // If no communities selected, fetch from general "created" feed (default: https://peakd.com/created)
     else {
-      const defaultQuery = {
-        jsonrpc: '2.0',
-        method: 'condenser_api.get_discussions_by_created',
-        params: [{ tag: '', limit: requestLimit }],
-        id: Math.random()
-      };
-      
-      const defaultResult = await rpc(defaultQuery.method, defaultQuery.params);
-      if (defaultResult.result) {
-        allPosts = [...allPosts, ...defaultResult.result];
+      try {
+        const defaultResult = await rpc('condenser_api.get_discussions_by_created', [{ tag: '', limit: requestLimit }]);
+        if (defaultResult.result) {
+          allPosts = [...allPosts, ...defaultResult.result];
+        }
+      } catch (error) {
+        console.error('Error fetching default posts:', error);
+        return [];
       }
     }
 

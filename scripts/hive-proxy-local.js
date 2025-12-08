@@ -10,7 +10,7 @@ const HIVE_RPC_NODES = [
   'https://api.ausbit.dev'
 ];
 
-const PORT = parseInt(process.argv[2], 10) || 7070;
+const PORT = parseInt(process.argv[2], 10) || 8788;
 
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);

@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"node ./scripts/scan-runner.js\" \"vite\"",
+    "dev": "concurrently \"node ./scripts/scan-runner.js\" \"node ./scripts/hive-proxy-local.js\" \"vite\"",
+    "hive-proxy-local": "node ./scripts/hive-proxy-local.js",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "scan-runner": "node ./scripts/scan-runner.js",
