@@ -1,13 +1,10 @@
-// Lightweight Hive RPC helper using Supabase Edge Function proxy to avoid CORS issues
+// Lightweight Hive RPC helper using local proxy and direct node calls
 export interface RpcResponse<T = any> {
   id: number | string
   jsonrpc: '2.0'
   result?: T
   error?: any
 }
-
-// Hive proxy is implemented as a Supabase Edge Function, so we call it via the Supabase client
-import { supabase } from '@/integrations/supabase/client';
 
 // Fallback list of public Hive RPC nodes for direct browser calls if the proxy fails
 const HIVE_RPC_NODES = [
@@ -62,7 +59,7 @@ export async function directPost<T = any>(method: string, params: any): Promise<
   throw new Error('All direct RPC nodes failed');
 }
 
-// Perform a JSON-RPC call via the Supabase proxy. Returns the underlying Hive JSON-RPC response.
+// Perform a JSON-RPC call with local proxy first, then fallback to direct nodes
 export async function rpc<T = any>(method: string, params: any): Promise<RpcResponse<T>> {
   const payload = {
     jsonrpc: '2.0' as const,
@@ -71,13 +68,15 @@ export async function rpc<T = any>(method: string, params: any): Promise<RpcResp
     id: Date.now(),
   };
 
+  const body = JSON.stringify(payload);
+
   // Try 1: Local proxy if available (http://localhost:8788)
   try {
     console.log('Trying local proxy at http://localhost:8788...');
     const res = await fetch('http://localhost:8788/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body,
     });
 
     const text = await res.text();
@@ -88,7 +87,7 @@ export async function rpc<T = any>(method: string, params: any): Promise<RpcResp
       if (json && typeof json === 'object') {
         // Local proxy returns { result: <jsonrpc> } or { node, result: <jsonrpc> } or { error: true, ... }
         if ('error' in json && json.error) {
-          console.warn('Local proxy returned error, continuing to next method...', json);
+          console.warn('Local proxy returned error, trying direct nodes...', json);
         } else if ('result' in json) {
           console.log('✓ Local proxy success, got valid RPC response');
           return json.result || json;
@@ -98,79 +97,39 @@ export async function rpc<T = any>(method: string, params: any): Promise<RpcResp
         }
       }
     } catch (parseErr) {
-      console.warn('Local proxy returned non-JSON, continuing...', parseErr);
+      console.warn('Local proxy returned non-JSON, trying direct nodes...', parseErr);
     }
   } catch (localErr) {
-    console.log('Local proxy not available, continuing to Edge Function...', localErr);
+    console.log('Local proxy not available, trying direct nodes...', localErr);
   }
 
-  // Try 2: Supabase Edge Function proxy
-  try {
-    console.log('Trying Supabase Edge Function proxy...');
-    const { data, error } = await supabase.functions.invoke('hive-proxy', {
-      body: { rpc: payload },
-    });
+  // Try 2: Direct public Hive RPC nodes (with tolerant parsing for CORS issues)
+  for (const node of HIVE_RPC_NODES) {
+    try {
+      const res = await fetch(node, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
 
-    if (error) {
-      console.error('Hive proxy invoke error:', error);
-      throw new Error(error.message || 'Hive proxy invoke error');
-    }
-
-    if (!data) {
-      throw new Error('No data returned from Hive proxy');
-    }
-
-    // Edge function returns either { node, result: <jsonrpc> } or { error: true, message, ... }
-    if ('error' in data && (data as any).error) {
-      console.error('Hive proxy responded with error:', data);
-      throw new Error((data as any).message || 'Hive proxy error');
-    }
-
-    const rpcResponse = (data as { node: string; result: RpcResponse<T> }).result;
-
-    if (rpcResponse && typeof rpcResponse === 'object' && 'result' in rpcResponse) {
-      console.log('✓ Hive API success via proxy node', (data as { node: string }).node);
-      return rpcResponse;
-    }
-
-    console.error('Unexpected Hive proxy response shape:', data);
-    throw new Error('Invalid response format from Hive proxy');
-  } catch (e) {
-    // If the proxy fails (e.g. all RPC nodes down from Supabase), fall back to direct browser calls
-    console.warn('Hive proxy failed, falling back to direct Hive RPC nodes:', e);
-
-    for (const node of HIVE_RPC_NODES) {
+      // Try to parse even if status is not OK
+      const text = await res.text();
       try {
-        const res = await fetch(node, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!res.ok) {
-          console.warn(`Direct Hive RPC failed on ${node} with status ${res.status}`);
-          continue;
+        const json = JSON.parse(text) as RpcResponse<T>;
+        if (json && typeof json === 'object' && ('result' in json || 'error' in json)) {
+          console.log('✓ Hive API success via direct node', node);
+          return json;
         }
-
-        const text = await res.text();
-
-        try {
-          const json = JSON.parse(text) as RpcResponse<T>;
-          if (json && typeof json === 'object' && ('result' in json || 'error' in json)) {
-            console.log('✓ Hive API success via direct node', node);
-            return json;
-          }
-        } catch (parseErr) {
-          console.warn(`Direct Hive RPC returned invalid JSON from ${node}`, parseErr);
-          continue;
-        }
-      } catch (nodeErr) {
-        console.warn(`Error calling direct Hive RPC node ${node}`, nodeErr);
+      } catch (parseErr) {
+        console.warn(`Direct Hive RPC from ${node} returned non-JSON (${res.status}):`, text.slice(0, 100));
         continue;
       }
+    } catch (nodeErr) {
+      console.warn(`Error calling direct Hive RPC node ${node}:`, nodeErr);
+      continue;
     }
-
-    console.error('All direct Hive RPC nodes failed after proxy failure');
-    throw e instanceof Error ? e : new Error(String(e));
   }
+
+  console.error('All RPC methods failed (local proxy and direct nodes)');
+  throw new Error('All RPC nodes failed. Make sure local proxy is running or check your internet connection.');
 }

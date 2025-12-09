@@ -230,75 +230,73 @@ export const fetchCharityPosts = async (): Promise<HivePost[]> => {
   }
 };
 
-// Fetch posts based on custom search criteria - uses rpc which goes through Edge Function proxy
+// Fetch posts based on custom search criteria
+// This implementation uses the same fetch approach as the TesteHive button:
+// POST to `VITE_HIVE_PROXY_URL` (if set) or to a public Hive node and parse the result tolerant.
 export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): Promise<HivePost[]> => {
   try {
     const allKeywords = [...criteria.keywords, ...criteria.customKeywords];
     let allPosts: any[] = [];
-    
-    // Hive API has a maximum limit of 20 for bridge.get_ranked_posts
+
+    // No helper: we'll call the same fetch code inline (same as TesteHive) for each query
+
+    // Determine queries based on selected communities or default
     const maxLimit = 20;
     const requestLimit = Math.min(criteria.articleCount, maxLimit);
-    
-    // If communities are selected, ONLY fetch from those communities (no keyword searches)
-    if (criteria.communities.length > 0) {
-      const communityResults = await Promise.all(
-        criteria.communities.map(async (communityId) => {
-          try {
-            if (communityId === 'trending') {
-              // Use bridge.get_ranked_posts with trending sort for the global trending feed
-              return await rpc('bridge.get_ranked_posts', { tag: '', sort: 'trending', limit: requestLimit });
-            } else {
-              return await rpc('bridge.get_ranked_posts', { tag: communityId, sort: 'created', limit: requestLimit });
-            }
-          } catch (error) {
-            console.error('Error fetching community posts:', { communityId, error });
-            return null;
-          }
-        })
-      );
 
-      communityResults.forEach((data) => {
-        if (data && data.result) {
-          allPosts = [...allPosts, ...data.result];
+    if (criteria.communities && criteria.communities.length > 0) {
+      for (const communityId of criteria.communities) {
+        // Use the exact TesteHive fetch approach: condenser_api.get_discussions_by_created
+        const rpc = (import.meta.env.VITE_HIVE_PROXY_URL as string) || 'https://api.hive.blog';
+        const body = JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_discussions_by_created', params: [{ tag: communityId === 'trending' ? '' : communityId, limit: requestLimit }], id: 1 });
+        try {
+          const resp = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+          const data = await resp.json();
+          let items: any[] = [];
+          if (Array.isArray(data?.result)) items = data.result;
+          else if (Array.isArray(data?.result?.items)) items = data.result.items;
+          else if (data?.result && typeof data.result === 'object') {
+            items = Object.values(data.result).filter((v: any) => Array.isArray(v)).flat() as any[];
+          }
+          allPosts = [...allPosts, ...(items || [])];
+        } catch (err) {
+          console.error('fetchRpc failed for community', communityId, err);
         }
-      });
-    } 
-    // If no communities selected, fetch from general "created" feed (default: https://peakd.com/created)
-    else {
+      }
+    } else {
+      // default created feed — use same TesteHive fetch
+      const rpc = (import.meta.env.VITE_HIVE_PROXY_URL as string) || 'https://api.hive.blog';
+      const body = JSON.stringify({ jsonrpc: '2.0', method: 'condenser_api.get_discussions_by_created', params: [{ tag: '', limit: requestLimit }], id: 1 });
       try {
-        const defaultResult = await rpc('condenser_api.get_discussions_by_created', [{ tag: '', limit: requestLimit }]);
-        if (defaultResult.result) {
-          allPosts = [...allPosts, ...defaultResult.result];
+        const resp = await fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        const data = await resp.json();
+        let items: any[] = [];
+        if (Array.isArray(data?.result)) items = data.result;
+        else if (Array.isArray(data?.result?.items)) items = data.result.items;
+        else if (data?.result && typeof data.result === 'object') {
+          items = Object.values(data.result).filter((v: any) => Array.isArray(v)).flat() as any[];
         }
-      } catch (error) {
-        console.error('Error fetching default posts:', error);
-        return [];
+        allPosts = [...allPosts, ...(items || [])];
+      } catch (err) {
+        console.error('fetchRpc failed for default feed', err);
       }
     }
 
-    // Filter posts based on search criteria
-    const filteredPosts = allPosts.filter(post => {
+    // Now filter posts based on keywords/tags/body as before
+    const filteredPosts = (allPosts || []).filter(post => {
       const title = post.title?.toLowerCase() || '';
       const body = post.body?.toLowerCase() || '';
-      
-      // Safely parse json_metadata (could be string, object, or invalid JSON)
+
       let tags: string[] = [];
       try {
         if (post.json_metadata) {
-          const metadata = typeof post.json_metadata === 'string' 
-            ? JSON.parse(post.json_metadata) 
-            : post.json_metadata;
+          const metadata = typeof post.json_metadata === 'string' ? JSON.parse(post.json_metadata) : post.json_metadata;
           tags = metadata.tags || [];
         }
-      } catch (e) {
-        // Invalid JSON - skip tags
-        tags = [];
-      }
+      } catch (e) { tags = []; }
       const tagsStr = tags.join(' ').toLowerCase();
 
-      // Check if post matches any keyword
-      const matchesKeyword = allKeywords.some(keyword => {
+      const matchesKeyword = allKeywords.length === 0 ? true : allKeywords.some(keyword => {
         const kw = keyword.toLowerCase();
         if (criteria.searchInTags && tagsStr.includes(kw)) return true;
         if (criteria.searchInBody && (title.includes(kw) || body.includes(kw))) return true;
@@ -308,59 +306,40 @@ export const fetchCharityPostsWithCriteria = async (criteria: SearchCriteria): P
       return matchesKeyword;
     });
 
-    // Helper to safely extract tags (reuse from above)
+    // Helper to safely extract tags
     const safeParseTags = (jsonMetadata: any): string[] => {
-      try {
-        if (!jsonMetadata) return [];
-        const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata;
-        return metadata.tags || [];
-      } catch (e) {
-        return [];
-      }
+      try { if (!jsonMetadata) return []; const metadata = typeof jsonMetadata === 'string' ? JSON.parse(jsonMetadata) : jsonMetadata; return metadata.tags || []; } catch (e) { return []; }
     };
 
-    // Process and format posts
     const processedPosts = filteredPosts.map((post: any) => ({
       author: post.author,
       permlink: post.permlink,
       title: post.title,
       created: post.created,
-  body: getPreviewText(post, 200),
+      body: getPreviewText(post, 200),
       category: post.category,
       tags: safeParseTags(post.json_metadata),
       community: post.community,
       community_title: post.community_title,
-      payout: parseFloat(post.pending_payout_value.split(' ')[0]),
+      payout: parseFloat((post.pending_payout_value || '0.00 HIVE').split(' ')[0]),
       upvoted: false,
       image_url: extractImageUrl(post),
       author_reputation: formatReputation(post.author_reputation)
     }));
 
-    // Apply time-based filtering if requested (slider: N -> show posts younger than N+1 days). If N == 100 -> no time filter.
+    // Apply time-based filtering
     let timeFiltered = processedPosts;
     if (typeof criteria.maxAgeDays === 'number' && criteria.maxAgeDays < 100) {
       const cutoffDays = criteria.maxAgeDays + 1;
       const cutoffTs = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
       timeFiltered = processedPosts.filter(p => {
-        try {
-          return new Date(p.created).getTime() > cutoffTs;
-        } catch (e) {
-          return false;
-        }
+        try { return new Date(p.created).getTime() > cutoffTs; } catch (e) { return false; }
       });
     }
 
-    // Deduplicate (apply to timeFiltered list)
-    const uniquePosts = timeFiltered.filter((post, index, self) =>
-      index === self.findIndex((p) => p.author === post.author && p.permlink === post.permlink)
-    );
+    const uniquePosts = timeFiltered.filter((post, index, self) => index === self.findIndex((p) => p.author === post.author && p.permlink === post.permlink));
 
-    console.log("Total unique posts found with criteria:", uniquePosts.length);
-
-    // Sort by created date (newest first) and limit to requested count
-    return uniquePosts
-      .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime())
-      .slice(0, criteria.articleCount);
+    return uniquePosts.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()).slice(0, criteria.articleCount);
   } catch (error) {
     console.error('Error fetching posts with criteria:', error);
     return [];
