@@ -43,6 +43,9 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
   const [testTitles, setTestTitles] = useState<string[]>([]);
+  const [bgAnalyzing, setBgAnalyzing] = useState(false);
+  const [bgTotal, setBgTotal] = useState(0);
+  const [bgRemaining, setBgRemaining] = useState(0);
   const maxShown = 30;
 
   // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
@@ -370,12 +373,121 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
     setLoading(false);
   };
 
+  // Start background analysis for visible posts that currently show a Mock analysis.
+  const startBackgroundAnalysis = () => {
+    if (bgAnalyzing) return;
+    // Determine keys of posts that have a mock analysis
+    const pending = posts
+      .map(p => `${p.author}/${p.permlink}`)
+      .filter(key => analyses[key]?.isMock === true);
+
+    if (!pending || pending.length === 0) {
+      toast({ title: 'Keine Mock-Analysen', description: 'Es wurden keine Beiträge mit Mock-Analyse gefunden.' });
+      return;
+    }
+
+    setBgTotal(pending.length);
+    setBgRemaining(pending.length);
+    setBgAnalyzing(true);
+
+    // Run the background worker but don't await here so UI stays responsive
+    (async () => {
+      try {
+        await backgroundAnalyze(pending);
+        toast({ title: 'Hintergrundanalyse abgeschlossen', description: 'Alle Mock-Analysen wurden erneut versucht.' });
+      } catch (e) {
+        console.error('Hintergrundanalyse fehlgeschlagen', e);
+        toast({ title: 'Fehler', description: 'Die Hintergrundanalyse ist mit einem Fehler beendet worden.', variant: 'destructive' });
+      } finally {
+        setBgAnalyzing(false);
+        setBgRemaining(0);
+        setBgTotal(0);
+      }
+    })();
+  };
+
+  // Background analyze logic: process keys (author/permlink) in batches of 3, retrying those that still return mock
+  const backgroundAnalyze = async (initialKeys: string[]) => {
+    const pendingSet = new Set(initialKeys);
+    const BATCH = 3;
+    const COOLDOWN_MS = 60000; // 60s cooldown when rate limit is hit
+
+    while (pendingSet.size > 0) {
+      const toProcess = Array.from(pendingSet).slice(0, BATCH);
+      // Map keys back to HivePost objects
+      const postsToProcess = toProcess.map(k => {
+        const [author, permlink] = k.split('/');
+        return posts.find(p => p.author === author && p.permlink === permlink);
+      }).filter(Boolean) as HivePost[];
+
+      if (postsToProcess.length === 0) {
+        // Nothing to do for these keys, remove them
+        toProcess.forEach(k => pendingSet.delete(k));
+        setBgRemaining(pendingSet.size);
+        continue;
+      }
+
+      // Run analyses in parallel for this batch
+      const results = await Promise.all(postsToProcess.map(async (post) => {
+        try {
+          const res = await analyzeCharityPost(post);
+          return { key: `${post.author}/${post.permlink}`, res };
+        } catch (e) {
+          console.error('Background analyze failed for', post, e);
+          return { key: `${post.author}/${post.permlink}`, res: { charyScore: 0, summary: 'Analyse fehlgeschlagen', isMock: true } };
+        }
+      }));
+
+      // Update analyses state for completed attempts
+      setAnalyses(prev => {
+        const next = { ...prev };
+        for (const r of results) {
+          next[r.key] = r.res as any;
+        }
+        return next;
+      });
+
+      // Determine which keys still need reprocessing (those returning isMock === true)
+      let hitMock = false;
+      for (const r of results) {
+        if ((r.res as any).isMock === true) {
+          hitMock = true;
+          // keep in pendingSet to retry later
+        } else {
+          // remove from pending once we have a real analysis
+          pendingSet.delete(r.key);
+        }
+      }
+
+      setBgRemaining(pendingSet.size);
+
+      if (pendingSet.size === 0) break;
+
+      // If any result was a mock, wait for cooldown before next batch; otherwise proceed immediately
+      if (hitMock) {
+        // wait for the approximate rate-limit recovery window
+        await new Promise(resolve => setTimeout(resolve, COOLDOWN_MS));
+      } else {
+        // small pause to avoid hammering UI
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto mb-8">
       <div className="flex justify-center">
         <div className="flex items-center gap-3">
           <Button onClick={() => setSearchDialogOpen(true)} disabled={loading} className="bg-hive hover:bg-hive/90">
             {loading ? 'Suche läuft…' : 'Neue Beiträge suchen'}
+          </Button>
+          <Button
+            onClick={() => startBackgroundAnalysis()}
+            variant="default"
+            disabled={bgAnalyzing}
+            title="Analysiert im Hintergrund alle sichtbaren Beiträge mit Mock-Analyse"
+          >
+            {bgAnalyzing ? 'Hintergrundanalyse läuft…' : 'Hintergrundanalyse'}
           </Button>
           <Button onClick={() => setCharyDialogOpen(true)} variant="outline" disabled={charyRunning}>
             {!charyRunning ? '!CHARY suchen' : 'Suche läuft…'}
@@ -436,6 +548,20 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         onOpenChange={setSearchDialogOpen}
         onSearch={(criteria) => handleScan(criteria)}
       />
+
+      <Dialog open={bgAnalyzing} onOpenChange={(v) => { if (!v) setBgAnalyzing(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <Brain className="h-6 w-6 animate-spin text-hive" />
+              <span>Hintergrundanalyse</span>
+            </DialogTitle>
+            <DialogDescription>
+              Die Hintergrundanalyse läuft. Verbleibend: {bgRemaining} von {bgTotal} Beiträge.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={charyDialogOpen} onOpenChange={setCharyDialogOpen}>
         <DialogContent>
