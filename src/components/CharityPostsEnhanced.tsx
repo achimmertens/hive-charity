@@ -307,7 +307,7 @@ const CharityPostsEnhanced: React.FC<CharityPostsProps> = ({ user }) => {
                         size="sm"
                         onClick={() => {
                           const prefill = analyses[postId]
-                            ? `Chary-Score: ${analyses[postId].charyScore}/10\n\nKI-Antwort:\n${analyses[postId].summary}\n\n`
+                            ? `!CHARY:${analyses[postId].charyScore}\n\nKI-Antwort:\n${analyses[postId].summary}\n\n`
                             : '';
                           setReplyOpen((prev) => ({ ...prev, [postId]: !prev[postId] }));
                           if (!replyText[postId]) setReplyText((prev) => ({ ...prev, [postId]: prefill }));

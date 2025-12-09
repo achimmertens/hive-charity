@@ -773,7 +773,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
                               size="sm"
                               onClick={() => {
                                 const prefill = analysis
-                                  ? `Chary-Score: ${analysis.charyScore}/10\n\nKI-Antwort:\n${analysis.summary}\n\n`
+                                  ? `!CHARY:${analysis.charyScore}\n\nKI-Antwort:\n${analysis.summary}\n\n`
                                   : '';
                                 setReplyOpen((prev) => ({ ...prev, [postId]: !prev[postId] }));
                                 if (!replyText[postId]) setReplyText((prev) => ({ ...prev, [postId]: prefill }));
