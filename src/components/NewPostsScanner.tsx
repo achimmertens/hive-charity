@@ -14,6 +14,7 @@ import { de } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
 import { postComment, votePost } from "@/services/hiveComment";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { HiveUser } from "@/services/hiveAuth";
 import { SearchDialog, SearchCriteria } from "./SearchDialog";
@@ -46,6 +47,10 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
   const [bgAnalyzing, setBgAnalyzing] = useState(false);
   const [bgTotal, setBgTotal] = useState(0);
   const [bgRemaining, setBgRemaining] = useState(0);
+  const [bgDialogOpen, setBgDialogOpen] = useState(false);
+  const [bgFinished, setBgFinished] = useState(false);
+  const [currentBatchKeys, setCurrentBatchKeys] = useState<string[]>([]);
+  const bgAbortRef = React.useRef(false);
   const maxShown = 30;
 
   // Load favorite + chary flags + openai_response for currently displayed posts from Supabase
@@ -388,13 +393,21 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
 
     setBgTotal(pending.length);
     setBgRemaining(pending.length);
+    setBgDialogOpen(true);
+    setBgFinished(false);
+    bgAbortRef.current = false;
     setBgAnalyzing(true);
 
     // Run the background worker but don't await here so UI stays responsive
     (async () => {
       try {
-        await backgroundAnalyze(pending);
-        toast({ title: 'Hintergrundanalyse abgeschlossen', description: 'Alle Mock-Analysen wurden erneut versucht.' });
+        const completed = await backgroundAnalyze(pending);
+        if (completed) {
+          setBgFinished(true);
+          toast({ title: 'Hintergrundanalyse abgeschlossen', description: 'Alle Mock-Analysen wurden erneut versucht.' });
+        } else {
+          toast({ title: 'Hintergrundanalyse abgebrochen', description: 'Die Hintergrundanalyse wurde abgebrochen.' });
+        }
       } catch (e) {
         console.error('Hintergrundanalyse fehlgeschlagen', e);
         toast({ title: 'Fehler', description: 'Die Hintergrundanalyse ist mit einem Fehler beendet worden.', variant: 'destructive' });
@@ -402,18 +415,24 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         setBgAnalyzing(false);
         setBgRemaining(0);
         setBgTotal(0);
+        setCurrentBatchKeys([]);
       }
     })();
   };
 
   // Background analyze logic: process keys (author/permlink) in batches of 3, retrying those that still return mock
-  const backgroundAnalyze = async (initialKeys: string[]) => {
+  const backgroundAnalyze = async (initialKeys: string[]) : Promise<boolean> => {
     const pendingSet = new Set(initialKeys);
     const BATCH = 3;
     const COOLDOWN_MS = 60000; // 60s cooldown when rate limit is hit
 
     while (pendingSet.size > 0) {
+      if (bgAbortRef.current) {
+        // Aborted by user
+        return false;
+      }
       const toProcess = Array.from(pendingSet).slice(0, BATCH);
+      setCurrentBatchKeys(toProcess);
       // Map keys back to HivePost objects
       const postsToProcess = toProcess.map(k => {
         const [author, permlink] = k.split('/');
@@ -461,6 +480,10 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
 
       setBgRemaining(pendingSet.size);
 
+      if (bgAbortRef.current) {
+        return false;
+      }
+
       if (pendingSet.size === 0) break;
 
       // If any result was a mock, wait for cooldown before next batch; otherwise proceed immediately
@@ -472,6 +495,10 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
+
+    // Completed all
+    setCurrentBatchKeys([]);
+    return true;
   };
 
   return (
@@ -549,7 +576,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         onSearch={(criteria) => handleScan(criteria)}
       />
 
-      <Dialog open={bgAnalyzing} onOpenChange={(v) => { if (!v) setBgAnalyzing(false); }}>
+      <Dialog open={bgDialogOpen} onOpenChange={(v) => { if (!v && !bgAnalyzing) setBgDialogOpen(false); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
@@ -557,10 +584,65 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
               <span>Hintergrundanalyse</span>
             </DialogTitle>
             <DialogDescription>
-              Die Hintergrundanalyse läuft. Verbleibend: {bgRemaining} von {bgTotal} Beiträge.
+              {bgAnalyzing ? (
+                <>{`Die Hintergrundanalyse läuft. Verbleibend: ${bgRemaining} von ${bgTotal} Beiträge.`}</>
+              ) : bgFinished ? (
+                <span className="font-semibold text-green-700">Fertig — alle Artikel analysiert</span>
+              ) : (
+                <>{`Nicht aktiv. Verbleibend: ${bgRemaining} von ${bgTotal} Beiträge.`}</>
+              )}
             </DialogDescription>
           </DialogHeader>
+
+          <div className="py-4">
+            <Progress value={bgTotal > 0 ? Math.round(((bgTotal - bgRemaining) / bgTotal) * 100) : 0} />
+            <div className="mt-3 text-sm text-gray-700">
+              {bgTotal > 0 && (
+                <div className="mb-2">Fortschritt: {bgTotal - bgRemaining} / {bgTotal}</div>
+              )}
+              {currentBatchKeys.length > 0 && (
+                <div className="space-y-1">
+                  <div className="font-medium">Aktuell analysiert:</div>
+                  {currentBatchKeys.map((key) => {
+                    const [author, permlink] = key.split('/');
+                    const post = posts.find(p => `${p.author}/${p.permlink}` === key);
+                    const title = post?.title || key;
+                    const url = `https://peakd.com/@${author}/${permlink}`;
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <a href={url} target="_blank" rel="noreferrer" className="text-hive hover:underline">{title}</a>
+                        <span className="text-xs text-gray-500">- {author}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
+        <DialogFooter>
+          <div className="flex items-center justify-between w-full">
+            <div>
+              <Button variant="destructive" onClick={() => {
+                // Cancel: abort background processing but keep dialog open
+                if (!bgAnalyzing) return;
+                bgAbortRef.current = true;
+                setBgAnalyzing(false);
+              }} disabled={!bgAnalyzing}>
+                Abbrechen
+              </Button>
+            </div>
+            <div>
+              <Button onClick={() => {
+                // Close dialog only when not actively analyzing
+                if (bgAnalyzing) return;
+                setBgDialogOpen(false);
+              }}>
+                Schließen
+              </Button>
+            </div>
+          </div>
+        </DialogFooter>
       </Dialog>
 
       <Dialog open={charyDialogOpen} onOpenChange={setCharyDialogOpen}>
@@ -705,9 +787,7 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
               </ul>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTestDialogOpen(false)}>Schließen</Button>
-          </DialogFooter>
+          
         </DialogContent>
       </Dialog>
 
