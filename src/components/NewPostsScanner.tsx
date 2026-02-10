@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import type { LogLevel } from "@/hooks/useActivityLog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { AlertTriangle, Brain, Calendar, ExternalLink, Tag, User, ThumbsUp } from "lucide-react";
@@ -21,9 +22,14 @@ import { SearchDialog, SearchCriteria } from "./SearchDialog";
 
 interface NewPostsScannerProps {
   user: HiveUser;
+  addLog?: (level: LogLevel, message: string) => void;
+  setSupabaseStatus?: (ok: boolean) => void;
 }
 
-const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
+const noop = () => {};
+const noopLog: (level: LogLevel, message: string) => void = noop as any;
+
+const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user, addLog = noopLog, setSupabaseStatus }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<HivePost[]>([]);
@@ -274,31 +280,44 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
     try {
       let candidates: HivePost[];
       
+      addLog("info", "Suche nach neuen Hive-Beiträgen…");
+      
       // Use custom criteria if provided, otherwise use default search
       if (criteria) {
         candidates = await fetchCharityPostsWithCriteria(criteria);
         if (criteria.communityUrl) {
-          // Add logic to fetch posts from the specific community URL
           console.log(`Fetching posts from community URL: ${criteria.communityUrl}`);
         }
       } else {
         candidates = await fetchCharityPosts();
       }
       
+      addLog("success", `${(candidates || []).length} Beiträge von Hive geladen.`);
+      
       // Filter out posts containing Chinese characters in title or body
       const cjkRegex = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
       const candidatesFiltered = (candidates || []).filter(p => !cjkRegex.test(p.title) && !cjkRegex.test(p.body));
       if (!candidatesFiltered || candidatesFiltered.length === 0) {
         toast({ title: "Keine Beiträge gefunden", description: "Es konnten aktuell keine neuen Beiträge geladen werden." });
+        addLog("warn", "Keine passenden Beiträge nach Filterung gefunden.");
         setLoading(false);
         return;
       }
 
+      addLog("info", "Prüfe Supabase auf bereits analysierte Beiträge…");
       const urls = candidatesFiltered.map(p => `https://peakd.com/@${p.author}/${p.permlink}`);
-      const { data: existing } = await supabase
+      const { data: existing, error: sbError } = await supabase
         .from('charity_analysis_results')
         .select('article_url')
         .in('article_url', urls);
+
+      if (sbError) {
+        addLog("error", `Supabase-Abfrage fehlgeschlagen: ${sbError.message}`);
+        setSupabaseStatus?.(false);
+      } else {
+        setSupabaseStatus?.(true);
+        addLog("success", `Supabase: ${(existing ?? []).length} bereits bekannte Beiträge gefunden.`);
+      }
 
       const existingUrls = new Set((existing ?? []).map(r => r.article_url as string));
       const limit = criteria?.articleCount || 10;
@@ -306,11 +325,14 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
 
       if (newOnes.length === 0) {
         toast({ title: "Keine neuen Beiträge", description: "Alle gefundenen Beiträge wurden bereits angezeigt." });
+        addLog("info", "Alle gefundenen Beiträge sind bereits in der Datenbank.");
         setPosts([]);
         setAnalyses({});
         setLoading(false);
         return;
       }
+
+      addLog("info", `${newOnes.length} neue Beiträge werden jetzt per KI analysiert…`);
 
   // Only add new posts that are not already present in state/localStorage
   // We'll merge new ones in front of existing posts, preserving newest-first order
@@ -322,10 +344,13 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
       // Analyze in parallel
       const results = await Promise.all(newOnes.map(async (post) => {
         try {
+          addLog("info", `KI-Analyse: „${post.title.slice(0, 40)}…"`);
           const res = await analyzeCharityPost(post);
+          addLog("success", `Analyse fertig: „${post.title.slice(0, 30)}…" → Score ${res.charyScore}${res.isMock ? ' (Mock)' : ''}`);
           return { key: `${post.author}/${post.permlink}`, post, res } as const;
         } catch (e) {
           console.error('Analyse fehlgeschlagen', e);
+          addLog("error", `Analyse fehlgeschlagen: „${post.title.slice(0, 30)}…"`);
           return { key: `${post.author}/${post.permlink}`, post, res: { charyScore: 0, summary: 'Analyse fehlgeschlagen.' } } as const;
         }
       }));
@@ -362,16 +387,19 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user }) => {
         checkVoteStatus(persisted.map(p => p.post), user.username);
       }
 
+      addLog("success", `${newOnes.length} Beiträge analysiert und in Supabase gespeichert.`);
       toast({ title: `${newOnes.length} neue Beiträge analysiert`, description: "Die Ergebnisse wurden auch in der Historie gespeichert." });
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes('All RPC nodes failed')) {
+        addLog("error", "Hive-RPC-Knoten nicht erreichbar.");
         toast({
           title: "Hive-Suche derzeit nicht verfügbar",
           description: "Es konnten keine Hive-RPC-Knoten erreicht werden. Bitte versuchen Sie es später erneut.",
         });
       } else {
+        addLog("error", `Fehler: ${message}`);
         toast({ title: "Fehler beim Suchen", description: message, variant: "destructive" });
       }
     }
