@@ -6,6 +6,7 @@ import { CheckCircle, Info, AlertTriangle, CircleAlert } from "lucide-react";
 interface ActivityLogPanelProps {
   logs: LogEntry[];
   supabaseOk: boolean | null;
+  aiStatus: { ok: boolean | null; model: string };
 }
 
 const levelIcon: Record<string, React.ReactNode> = {
@@ -15,13 +16,13 @@ const levelIcon: Record<string, React.ReactNode> = {
   error: <CircleAlert className="w-3.5 h-3.5 text-destructive shrink-0" />,
 };
 
-const ActivityLogPanel: React.FC<ActivityLogPanelProps> = ({ logs, supabaseOk }) => {
+const ActivityLogPanel: React.FC<ActivityLogPanelProps> = ({ logs, supabaseOk, aiStatus }) => {
   return (
     <div className="border rounded-lg bg-card text-card-foreground shadow-sm flex flex-col h-full max-h-[80vh]">
-      {/* Header with Supabase status */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/40 rounded-t-lg">
+      {/* Header with status indicators */}
+      <div className="flex flex-col gap-1.5 px-4 py-3 border-b bg-muted/40 rounded-t-lg">
         <span className="font-semibold text-sm">Aktivitätslog</span>
-        <div className="ml-auto flex items-center gap-1.5 text-xs">
+        <div className="flex items-center gap-1.5 text-xs">
           {supabaseOk === null ? (
             <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground animate-pulse" />
           ) : supabaseOk ? (
@@ -31,6 +32,18 @@ const ActivityLogPanel: React.FC<ActivityLogPanelProps> = ({ logs, supabaseOk })
           )}
           <span className="text-muted-foreground">
             Supabase {supabaseOk === null ? "prüfe…" : supabaseOk ? "verbunden" : "nicht erreichbar"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          {aiStatus.ok === null ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground animate-pulse" />
+          ) : aiStatus.ok ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full bg-destructive" />
+          )}
+          <span className="text-muted-foreground">
+            KI {aiStatus.model || "…"} {aiStatus.ok === null ? "prüfe…" : aiStatus.ok ? "verfügbar" : "nicht verfügbar"}
           </span>
         </div>
       </div>

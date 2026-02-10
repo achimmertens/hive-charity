@@ -24,12 +24,13 @@ interface NewPostsScannerProps {
   user: HiveUser;
   addLog?: (level: LogLevel, message: string) => void;
   setSupabaseStatus?: (ok: boolean) => void;
+  setAiAvailability?: (ok: boolean, model: string) => void;
 }
 
 const noop = () => {};
 const noopLog: (level: LogLevel, message: string) => void = noop as any;
 
-const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user, addLog = noopLog, setSupabaseStatus }) => {
+const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user, addLog = noopLog, setSupabaseStatus, setAiAvailability }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [posts, setPosts] = useState<HivePost[]>([]);
@@ -346,10 +347,23 @@ const NewPostsScanner: React.FC<NewPostsScannerProps> = ({ user, addLog = noopLo
         try {
           addLog("info", `KI-Analyse: „${post.title.slice(0, 40)}…"`);
           const res = await analyzeCharityPost(post);
-          addLog("success", `Analyse fertig: „${post.title.slice(0, 30)}…" → Score ${res.charyScore}${res.isMock ? ' (Mock)' : ''}`);
+          if (!res.isMock) {
+            // Extract model name from openaiResponse if available
+            let modelName = "gpt-4o-mini";
+            try {
+              const parsed = res.openaiResponse ? JSON.parse(res.openaiResponse) : null;
+              if (parsed?.model) modelName = parsed.model;
+            } catch {}
+            setAiAvailability?.(true, modelName);
+            addLog("success", `✓ „${post.title.slice(0, 30)}…" → Score ${res.charyScore}`);
+          } else {
+            setAiAvailability?.(false, "gpt-4o-mini");
+            addLog("warn", `KI nicht erreichbar – Fallback für „${post.title.slice(0, 30)}…"`);
+          }
           return { key: `${post.author}/${post.permlink}`, post, res } as const;
         } catch (e) {
           console.error('Analyse fehlgeschlagen', e);
+          setAiAvailability?.(false, "gpt-4o-mini");
           addLog("error", `Analyse fehlgeschlagen: „${post.title.slice(0, 30)}…"`);
           return { key: `${post.author}/${post.permlink}`, post, res: { charyScore: 0, summary: 'Analyse fehlgeschlagen.' } } as const;
         }

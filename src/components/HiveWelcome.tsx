@@ -11,7 +11,7 @@ interface HiveWelcomeProps {
 }
 
 const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user }) => {
-  const { logs, addLog, supabaseOk, setSupabaseStatus } = useActivityLog();
+  const { logs, addLog, supabaseOk, setSupabaseStatus, aiStatus, setAiAvailability } = useActivityLog();
 
   // Check Supabase connectivity on mount
   useEffect(() => {
@@ -51,13 +51,13 @@ const HiveWelcome: React.FC<HiveWelcomeProps> = ({ user }) => {
       <div className="max-w-7xl mx-auto flex gap-4">
         {/* Main content – posts */}
         <div className="flex-1 min-w-0">
-          <NewPostsScanner user={user} addLog={addLog} setSupabaseStatus={setSupabaseStatus} />
+          <NewPostsScanner user={user} addLog={addLog} setSupabaseStatus={setSupabaseStatus} setAiAvailability={setAiAvailability} />
         </div>
 
         {/* Right sidebar – activity log */}
         <div className="hidden lg:block w-72 shrink-0">
           <div className="sticky top-4">
-            <ActivityLogPanel logs={logs} supabaseOk={supabaseOk} />
+            <ActivityLogPanel logs={logs} supabaseOk={supabaseOk} aiStatus={aiStatus} />
           </div>
         </div>
       </div>
