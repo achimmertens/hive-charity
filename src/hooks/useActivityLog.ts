@@ -14,6 +14,7 @@ let globalId = 0;
 export function useActivityLog() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [supabaseOk, setSupabaseOk] = useState<boolean | null>(null);
+  const [aiStatus, setAiStatus] = useState<{ ok: boolean | null; model: string }>({ ok: null, model: "" });
 
   const addLog = useCallback((level: LogLevel, message: string) => {
     const entry: LogEntry = { id: ++globalId, timestamp: new Date(), level, message };
@@ -24,5 +25,9 @@ export function useActivityLog() {
     setSupabaseOk(ok);
   }, []);
 
-  return { logs, addLog, supabaseOk, setSupabaseStatus };
+  const setAiAvailability = useCallback((ok: boolean, model: string) => {
+    setAiStatus({ ok, model });
+  }, []);
+
+  return { logs, addLog, supabaseOk, setSupabaseStatus, aiStatus, setAiAvailability };
 }
